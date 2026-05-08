@@ -56,6 +56,7 @@ export default function AdminPanelPage() {
     return users.filter((user) => {
       return [
         user.fullName,
+        user.initials,
         user.email,
         user.role,
         user.phone,
@@ -163,6 +164,11 @@ export default function AdminPanelPage() {
                   </div>
 
                   <div className="space-y-2">
+                    <label className={labelClass}>Isim Kisaltmasi</label>
+                    <input className={inputClass} name="initials" placeholder="AY" maxLength={4} required />
+                  </div>
+
+                  <div className="space-y-2">
                     <label className={labelClass}>E-posta</label>
                     <div className="relative">
                       <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
@@ -240,11 +246,11 @@ export default function AdminPanelPage() {
                           <td>
                             <div className="flex items-center gap-3">
                               <div className="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-white">
-                                {user.fullName.split(' ').map((part) => part[0]).join('').slice(0, 2)}
+                                {user.initials}
                               </div>
                               <div className="flex flex-col">
                                 <span className="text-white font-medium">{user.fullName}</span>
-                                <span className="text-xs text-slate-500">{user.email}</span>
+                                <span className="text-xs text-slate-500">{user.initials} - {user.email}</span>
                               </div>
                             </div>
                           </td>

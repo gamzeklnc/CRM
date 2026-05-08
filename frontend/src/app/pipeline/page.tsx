@@ -33,6 +33,16 @@ const stageBorderColor = (color: string) => {
   return '#94A3B8';
 };
 
+const ownerInitials = (owner: string) => {
+  return owner
+    .split(',')
+    .map((name) => name.trim())
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((name) => name.includes(' ') ? name.split(' ').map((part) => part[0]).join('').slice(0, 2) : name.slice(0, 4))
+    .join('+');
+};
+
 export default function PipelinePage() {
   const [view, setView] = useState<'table' | 'kanban'>('table');
   const [deals, setDeals] = useState<DealItem[]>([]);
@@ -225,9 +235,9 @@ export default function PipelinePage() {
                         <td>
                           <div className="flex items-center gap-2">
                             <div className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-[10px] font-bold">
-                              {deal.owner.split(' ').map(n => n[0]).join('')}
+                              {ownerInitials(deal.owner)}
                             </div>
-                            <span className="text-sm">{deal.owner}</span>
+                            <span className="text-sm" title={deal.owner}>{deal.owner}</span>
                           </div>
                         </td>
                         <td className="text-slate-400">{deal.capacity}</td>

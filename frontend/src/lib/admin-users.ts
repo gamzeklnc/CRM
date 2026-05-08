@@ -1,6 +1,7 @@
 export type AdminUser = {
   id: string;
   fullName: string;
+  initials: string;
   email: string;
   role: 'Admin' | 'Manager' | 'Sales';
   phone: string | null;
@@ -14,6 +15,7 @@ export const defaultAdminUsers: AdminUser[] = [
   {
     id: 'admin-1',
     fullName: 'Sistem Yöneticisi',
+    initials: 'SY',
     email: 'admin@company.com',
     role: 'Admin',
     phone: '+90 212 555 0001',
@@ -23,6 +25,7 @@ export const defaultAdminUsers: AdminUser[] = [
   {
     id: 'admin-2',
     fullName: 'Gamze Kılınç',
+    initials: 'GK',
     email: 'gamze@company.com',
     role: 'Sales',
     phone: '+90 532 000 0001',
@@ -49,12 +52,29 @@ const normalizeRole = (value: FormDataEntryValue | null): AdminUser['role'] => {
   return role === 'Admin' || role === 'Manager' || role === 'Sales' ? role : 'Sales';
 };
 
+const createInitials = (fullName: string) => {
+  return fullName
+    .trim()
+    .split(/\s+/)
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 3)
+    .toLocaleUpperCase('tr-TR');
+};
+
+const normalizeInitials = (value: FormDataEntryValue | string | null, fullName: string) => {
+  const initials = String(value ?? '').trim();
+  return (initials || createInitials(fullName)).slice(0, 4).toLocaleUpperCase('tr-TR');
+};
+
 const normalizeUser = (user: Partial<AdminUser>): AdminUser => {
   const now = new Date().toISOString();
+  const fullName = user.fullName ?? '';
 
   return {
     id: user.id ?? createId(),
-    fullName: user.fullName ?? '',
+    fullName,
+    initials: normalizeInitials(user.initials ?? null, fullName),
     email: user.email ?? '',
     role: user.role ?? 'Sales',
     phone: user.phone ?? null,
@@ -78,9 +98,11 @@ export function getAdminUsers() {
 }
 
 export function addAdminUser(formData: FormData) {
+  const fullName = String(formData.get('fullName') ?? '').trim();
   const user: AdminUser = {
     id: createId(),
-    fullName: String(formData.get('fullName') ?? '').trim(),
+    fullName,
+    initials: normalizeInitials(formData.get('initials'), fullName),
     email: String(formData.get('email') ?? '').trim(),
     role: normalizeRole(formData.get('role')),
     phone: normalizeOptional(formData.get('phone')),

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
@@ -16,6 +16,7 @@ import {
   User,
 } from 'lucide-react';
 import Sidebar from '@/components/layout/Sidebar';
+import { getAdminUsers, type AdminUser } from '@/lib/admin-users';
 import { getCustomers, type CustomerListItem } from '@/lib/customers';
 import { addDeal, dealStages } from '@/lib/deals';
 
@@ -25,20 +26,82 @@ const labelClass = "text-sm font-medium text-slate-300";
 export default function NewDealPage() {
   const router = useRouter();
   const [customers, setCustomers] = useState<CustomerListItem[]>([]);
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState('');
+  const [customerQuery, setCustomerQuery] = useState('');
+  const [isCustomerPickerOpen, setIsCustomerPickerOpen] = useState(false);
+  const [selectedOwnerIds, setSelectedOwnerIds] = useState<string[]>([]);
+  const [isOwnerPickerOpen, setIsOwnerPickerOpen] = useState(false);
   const [selectedStage, setSelectedStage] = useState(dealStages[0].name);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    setCustomers(getCustomers());
+    const storedCustomers = getCustomers();
+    const activeUsers = getAdminUsers().filter((user) => user.isActive);
+    setCustomers(storedCustomers);
+    setUsers(activeUsers);
   }, []);
 
   const stageConfig = dealStages.find((stage) => stage.name === selectedStage) ?? dealStages[0];
+  const selectedCustomer = useMemo(
+    () => customers.find((customer) => customer.id === selectedCustomerId) ?? null,
+    [customers, selectedCustomerId]
+  );
+  const filteredCustomers = useMemo(() => {
+    const query = customerQuery.trim().toLocaleLowerCase('tr-TR');
+    if (!query) return customers;
+
+    return customers.filter((customer) => customer.name.toLocaleLowerCase('tr-TR').includes(query));
+  }, [customerQuery, customers]);
+  const selectedOwners = useMemo(
+    () => users.filter((user) => selectedOwnerIds.includes(user.id)),
+    [selectedOwnerIds, users]
+  );
+
+  const handleCustomerInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value;
+    setCustomerQuery(value);
+    setIsCustomerPickerOpen(true);
+
+    if (selectedCustomer && value !== selectedCustomer.name) {
+      setSelectedCustomerId('');
+    }
+  };
+
+  const handleSelectCustomer = (customer: CustomerListItem) => {
+    setSelectedCustomerId(customer.id);
+    setCustomerQuery(customer.name);
+    setIsCustomerPickerOpen(false);
+  };
+
+  const toggleOwner = (userId: string) => {
+    setSelectedOwnerIds((current) => (
+      current.includes(userId)
+        ? current.filter((id) => id !== userId)
+        : [...current, userId]
+    ));
+  };
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!selectedCustomer) {
+      toast.error('Deal oluşturmadan önce kayıtlı bir müşteri seçin.');
+      return;
+    }
+    if (selectedOwners.length === 0) {
+      toast.error('En az bir satış sorumlusu seçin.');
+      return;
+    }
+
     setIsSaving(true);
 
     const formData = new FormData(event.currentTarget);
+    formData.set('company', selectedCustomer.name);
+    formData.set('owner', selectedOwners.map((owner) => owner.initials).join(', '));
+    if (selectedCustomer.city && !String(formData.get('city') ?? '').trim()) {
+      formData.set('city', selectedCustomer.city);
+    }
+
     const deal = addDeal(formData);
 
     setIsSaving(false);
@@ -67,7 +130,7 @@ export default function NewDealPage() {
 
         <form onSubmit={handleSubmit} className="p-8 space-y-8">
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-            <section className="xl:col-span-2 glass rounded-[32px] border border-border-subtle overflow-hidden">
+            <section className="xl:col-span-2 glass rounded-[32px] border border-border-subtle overflow-visible">
               <div className="p-6 border-b border-border-subtle flex items-center gap-3 bg-slate-800/30">
                 <Target className="w-5 h-5 text-blue-500" />
                 <h2 className="text-lg font-semibold text-white">Deal Bilgileri</h2>
@@ -81,17 +144,55 @@ export default function NewDealPage() {
 
                 <div className="space-y-2">
                   <label className={labelClass}>Şirket</label>
-                  <input className={inputClass} name="company" list="customer-options" placeholder="Şirket adı" required />
-                  <datalist id="customer-options">
-                    {customers.map((customer) => (
-                      <option key={customer.id} value={customer.name} />
-                    ))}
-                  </datalist>
+                  <div
+                    className="relative"
+                    onBlur={() => window.setTimeout(() => setIsCustomerPickerOpen(false), 120)}
+                  >
+                    <input
+                      className={inputClass}
+                      value={customerQuery}
+                      onChange={handleCustomerInputChange}
+                      onFocus={() => setIsCustomerPickerOpen(true)}
+                      placeholder={customers.length === 0 ? 'Kayitli musteri yok' : 'Musteri secin'}
+                      disabled={customers.length === 0}
+                      autoComplete="off"
+                    />
+                    {isCustomerPickerOpen && customers.length > 0 && (
+                      <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-64 overflow-y-auto rounded-2xl border border-border-subtle bg-slate-900 shadow-2xl shadow-black/30">
+                        {filteredCustomers.map((customer) => (
+                          <button
+                            key={customer.id}
+                            type="button"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => handleSelectCustomer(customer)}
+                            className="w-full px-4 py-3 text-left text-sm text-slate-200 transition-all hover:bg-blue-600/20 hover:text-white"
+                          >
+                            {customer.name}
+                          </button>
+                        ))}
+                        {filteredCustomers.length === 0 && (
+                          <div className="px-4 py-3 text-sm text-slate-500">
+                            Eslesen musteri yok
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <input type="hidden" name="company" value={selectedCustomer?.name ?? ''} />
+                  {customers.length === 0 ? (
+                    <Link href="/customers/new" className="inline-flex text-xs font-medium text-blue-400 hover:text-blue-300">
+                      Once musteri kaydi olusturun
+                    </Link>
+                  ) : selectedCustomer ? (
+                    <p className="text-xs text-slate-500">
+                      {selectedCustomer.contactName ?? 'Ilgili kisi yok'}{selectedCustomer.phone ? ` - ${selectedCustomer.phone}` : ''}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="space-y-2">
                   <label className={labelClass}>Şehir</label>
-                  <input className={inputClass} name="city" placeholder="İstanbul" />
+                  <input className={inputClass} name="city" placeholder="İstanbul" defaultValue={selectedCustomer?.city ?? ''} key={selectedCustomerId} />
                 </div>
 
                 <div className="space-y-2">
@@ -118,10 +219,53 @@ export default function NewDealPage() {
 
                 <div className="space-y-2">
                   <label className={labelClass}>Satış Sorumlusu</label>
-                  <div className="relative">
+                  <div
+                    className="relative"
+                    onBlur={() => window.setTimeout(() => setIsOwnerPickerOpen(false), 120)}
+                  >
                     <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <input className={`${inputClass} pl-11`} name="owner" defaultValue="Sistem Yöneticisi" required />
+                    <button
+                      type="button"
+                      onClick={() => setIsOwnerPickerOpen(true)}
+                      disabled={users.length === 0}
+                      className={`${inputClass} min-h-[46px] pl-11 text-left disabled:cursor-not-allowed disabled:opacity-60`}
+                    >
+                      <span className={`block truncate ${selectedOwners.length > 0 ? 'text-white' : 'text-slate-600'}`}>
+                        {selectedOwners.length > 0
+                          ? selectedOwners.map((owner) => owner.initials).join(', ')
+                          : users.length === 0 ? 'Kayitli kullanici yok' : 'Satis sorumlusu secin'}
+                      </span>
+                    </button>
+                    {isOwnerPickerOpen && users.length > 0 && (
+                      <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-72 overflow-y-auto rounded-2xl border border-border-subtle bg-slate-900 shadow-2xl shadow-black/30">
+                        {users.map((user) => {
+                          const isSelected = selectedOwnerIds.includes(user.id);
+
+                          return (
+                            <button
+                              key={user.id}
+                              type="button"
+                              onMouseDown={(event) => event.preventDefault()}
+                              onClick={() => toggleOwner(user.id)}
+                              className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm text-slate-200 transition-all hover:bg-blue-600/20 hover:text-white"
+                            >
+                              <span className="min-w-0">
+                                <span className="block truncate font-medium">{user.initials} - {user.fullName}</span>
+                                <span className="block truncate text-xs text-slate-500">{user.role} - {user.email}</span>
+                              </span>
+                              <span className={isSelected
+                                ? 'rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[10px] font-bold text-emerald-400'
+                                : 'rounded-full border border-border-subtle px-2 py-1 text-[10px] font-bold text-slate-500'
+                              }>
+                                {isSelected ? 'Secildi' : 'Sec'}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
+                  <input type="hidden" name="owner" value={selectedOwners.map((owner) => owner.initials).join(', ')} />
                 </div>
 
                 <div className="space-y-2">
@@ -212,7 +356,7 @@ export default function NewDealPage() {
             </Link>
             <button
               type="submit"
-              disabled={isSaving}
+              disabled={isSaving || customers.length === 0 || !selectedCustomer || selectedOwners.length === 0}
               className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold transition-all shadow-lg shadow-blue-500/20 disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
             >
               <Save className="w-4 h-4" />

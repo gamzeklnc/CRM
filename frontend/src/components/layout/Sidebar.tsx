@@ -18,6 +18,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { logout, hasRole } from '@/lib/auth';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -30,12 +31,18 @@ const sidebarItems = [
   { name: 'Win / Loss', icon: Trophy, path: '/win-loss' },
   { name: 'Activities', icon: CalendarCheck, path: '/activities' },
   { name: 'Reports', icon: BarChart, path: '/reports' },
-  { name: 'Admin Panel', icon: ShieldCheck, path: '/admin' },
+  { name: 'Admin Panel', icon: ShieldCheck, path: '/admin', roles: ['Admin'] },
 ];
 
 export default function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const pathname = usePathname();
+
+  const handleLogout = () => {
+    if (confirm('Çıkış yapmak istediğinize emin misiniz?')) {
+      logout();
+    }
+  };
 
   return (
     <motion.aside
@@ -69,6 +76,11 @@ export default function Sidebar() {
       {/* Navigation */}
       <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
         {sidebarItems.map((item) => {
+          // Role check
+          if (item.roles && !hasRole(item.roles)) {
+            return null;
+          }
+
           const isActive = pathname === item.path || (item.path !== '/' && pathname.startsWith(item.path));
           
           return (
@@ -107,7 +119,10 @@ export default function Sidebar() {
           {!isCollapsed && <span className="font-medium text-sm">Menüyü Daralt</span>}
         </button>
 
-        <button className="w-full flex items-center gap-3 px-3 py-3 mt-2 rounded-xl text-red-400 hover:bg-red-500/10 transition-all">
+        <button 
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-3 py-3 mt-2 rounded-xl text-red-400 hover:bg-red-500/10 transition-all"
+        >
           <LogOut className="w-5 h-5" />
           {!isCollapsed && <span className="font-medium text-sm">Çıkış Yap</span>}
         </button>

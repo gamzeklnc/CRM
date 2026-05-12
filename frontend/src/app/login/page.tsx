@@ -5,26 +5,44 @@ import { Mail, Lock, Eye, EyeOff, Loader2, ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { setCurrentUserByEmail } from '@/lib/auth';
+import { login as authLogin } from '@/lib/auth';
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
-    const formData = new FormData(e.currentTarget);
-    const email = String(formData.get('email') ?? 'admin@company.com');
     
-    // Simulate API call
-    setTimeout(() => {
+    const formData = new FormData(e.currentTarget);
+    const email = String(formData.get('email'));
+    const password = String(formData.get('password'));
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5295/api';
+      const response = await fetch(`${apiUrl}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        authLogin(data.token, data);
+        toast.success('Başarıyla giriş yapıldı!');
+        router.push('/');
+      } else {
+        toast.error(data.message || 'Giriş başarısız. Bilgilerinizi kontrol edin.');
+      }
+    } catch (error) {
+      toast.error('Sunucuya bağlanılamadı. Lütfen daha sonra tekrar deneyin.');
+      console.error('Login error:', error);
+    } finally {
       setIsLoading(false);
-      setCurrentUserByEmail(email);
-      toast.success('Başarıyla giriş yapıldı!');
-      router.push('/');
-    }, 1500);
+    }
   };
 
   return (
@@ -80,6 +98,7 @@ export default function LoginPage() {
               <div className="relative group">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 group-focus-within:text-blue-500 transition-colors" />
                 <input 
+                  name="password"
                   type={showPassword ? "text" : "password"} 
                   required
                   placeholder="••••••••"

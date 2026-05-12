@@ -37,11 +37,19 @@ export default function NewDealPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    const storedCustomers = getCustomers();
-    const activeUsers = getAdminUsers().filter((user) => user.isActive);
-    setCustomers(storedCustomers);
-    setUsers(activeUsers);
-    setLossReasonOptions(getLossReasonOptions());
+    const loadData = async () => {
+      const storedCustomers = getCustomers();
+      setCustomers(storedCustomers);
+      setLossReasonOptions(getLossReasonOptions());
+      
+      try {
+        const adminUsers = await getAdminUsers();
+        setUsers(adminUsers.filter((user) => user.isActive));
+      } catch (error) {
+        console.error("Failed to fetch admin users:", error);
+      }
+    };
+    loadData();
   }, []);
 
   const stageConfig = dealStages.find((stage) => stage.name === selectedStage) ?? dealStages[0];

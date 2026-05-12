@@ -37,17 +37,27 @@ export default function EditDealPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    const currentDeal = getDealById(params.id);
-    const activeUsers = getAdminUsers().filter((user) => user.isActive);
-    setDeal(currentDeal);
-    setCustomers(getCustomers());
-    setUsers(activeUsers);
-    setLossReasonOptions(getLossReasonOptions());
-    if (currentDeal) {
-      const ownerNames = currentDeal.owner.split(',').map((name) => name.trim()).filter(Boolean);
-      setSelectedStage(currentDeal.stage);
-      setSelectedOwnerIds(activeUsers.filter((user) => ownerNames.includes(user.fullName) || ownerNames.includes(user.initials)).map((user) => user.id));
-    }
+    const loadData = async () => {
+      const currentDeal = getDealById(params.id);
+      setDeal(currentDeal);
+      setCustomers(getCustomers());
+      setLossReasonOptions(getLossReasonOptions());
+
+      try {
+        const adminUsers = await getAdminUsers();
+        const activeUsers = adminUsers.filter((user) => user.isActive);
+        setUsers(activeUsers);
+
+        if (currentDeal) {
+          const ownerNames = currentDeal.owner.split(',').map((name) => name.trim()).filter(Boolean);
+          setSelectedStage(currentDeal.stage);
+          setSelectedOwnerIds(activeUsers.filter((user) => ownerNames.includes(user.fullName) || ownerNames.includes(user.initials)).map((user) => user.id));
+        }
+      } catch (error) {
+        console.error("Failed to fetch admin users:", error);
+      }
+    };
+    loadData();
   }, [params.id]);
 
   const stageConfig = dealStages.find((stage) => stage.name === selectedStage) ?? dealStages[0];

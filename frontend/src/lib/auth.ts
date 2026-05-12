@@ -1,30 +1,69 @@
-import { defaultAdminUsers, getAdminUsers, type AdminUser } from './admin-users';
+export type AuthUser = {
+  id: string;
+  fullName: string;
+  email: string;
+  role: 'Admin' | 'Manager' | 'Sales';
+  isActive: boolean;
+};
 
-const CURRENT_USER_KEY = 'solar-crm-current-user';
+const TOKEN_KEY = 'crm-token';
+const USER_KEY = 'crm-user';
 
-export function getCurrentUser(): AdminUser {
-  if (typeof window === 'undefined') return defaultAdminUsers[0];
+export function getToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(TOKEN_KEY);
+}
 
-  const rawUser = window.localStorage.getItem(CURRENT_USER_KEY);
-  if (!rawUser) return defaultAdminUsers[0];
-
+export function getCurrentUser(): AuthUser | null {
+  if (typeof window === 'undefined') return null;
+  const rawUser = localStorage.getItem(USER_KEY);
+  if (!rawUser) return null;
   try {
-    const user = JSON.parse(rawUser) as AdminUser;
-    return user;
+    return JSON.parse(rawUser) as AuthUser;
   } catch {
-    return defaultAdminUsers[0];
+    return null;
   }
 }
 
+export function isAuthenticated(): boolean {
+  return !!getToken();
+}
+
+export function hasRole(roles: string | string[]): boolean {
+  const user = getCurrentUser();
+  if (!user) return false;
+  
+  if (Array.isArray(roles)) {
+    return roles.includes(user.role);
+  }
+  return user.role === roles;
+}
+
+export function login(token: string, user: any) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(TOKEN_KEY, token);
+  localStorage.setItem(USER_KEY, JSON.stringify({
+    id: user.userId || user.id,
+    fullName: user.fullName,
+    email: user.email || '',
+    role: user.role,
+    isActive: true
+  }));
+}
+
+export function logout() {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+  window.location.href = '/login';
+}
+
+// Keeping these for compatibility with existing components during transition
 export function isCurrentUserAdmin() {
-  return getCurrentUser().role === 'Admin';
+  return hasRole('Admin');
 }
 
 export function setCurrentUserByEmail(email: string) {
-  if (typeof window === 'undefined') return defaultAdminUsers[0];
-
-  const normalizedEmail = email.trim().toLocaleLowerCase('tr-TR');
-  const user = getAdminUsers().find((item) => item.email.toLocaleLowerCase('tr-TR') === normalizedEmail) ?? defaultAdminUsers[0];
-  window.localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
-  return user;
+  // This was for the mock, we don't need it for real JWT but keeping signature to avoid breaks
+  console.log('setCurrentUserByEmail called with:', email);
 }

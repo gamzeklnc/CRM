@@ -81,11 +81,22 @@ export default function ReportsPage() {
   const [customers, setCustomers] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'sales' | 'pipeline' | 'winloss' | 'customers'>('sales');
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setDeals(getDeals());
-    setCustomers(getCustomers());
-    setUsers(getAdminUsers());
+    setMounted(true);
+    const loadData = async () => {
+      setDeals(getDeals());
+      setCustomers(getCustomers());
+      try {
+        const adminUsers = await getAdminUsers();
+        setUsers(adminUsers);
+      } catch (error) {
+        console.error("Failed to fetch admin users:", error);
+        setUsers([]);
+      }
+    };
+    loadData();
   }, []);
 
   // Performance Data
@@ -245,23 +256,25 @@ export default function ReportsPage() {
                 </button>
               </div>
               <div className="p-6 h-[400px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={salesPerformance} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={true} vertical={false} />
-                    <XAxis type="number" stroke="#64748b" fontSize={12} tickFormatter={(val) => `$${val/1000}k`} />
-                    <YAxis dataKey="initials" type="category" stroke="#64748b" fontSize={12} width={40} />
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px' }}
-                      itemStyle={{ color: '#fff' }}
-                      formatter={(val: number) => `$${val.toLocaleString()}`}
-                    />
-                    <Bar dataKey="totalValue" radius={[0, 4, 4, 0]} name="Toplam Kazanılan Değer">
-                      {salesPerformance.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+                {mounted && (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={salesPerformance} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={true} vertical={false} />
+                      <XAxis type="number" stroke="#64748b" fontSize={12} tickFormatter={(val) => `$${val/1000}k`} />
+                      <YAxis dataKey="initials" type="category" stroke="#64748b" fontSize={12} width={40} />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px' }}
+                        itemStyle={{ color: '#fff' }}
+                        formatter={(val: number) => `$${val.toLocaleString()}`}
+                      />
+                      <Bar dataKey="totalValue" radius={[0, 4, 4, 0]} name="Toplam Kazanılan Değer">
+                        {salesPerformance.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
               </div>
             </div>
 
@@ -277,28 +290,30 @@ export default function ReportsPage() {
                 </button>
               </div>
               <div className="p-6 h-[400px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={pipelineDistribution.filter(d => d.value > 0)}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={80}
-                      outerRadius={120}
-                      paddingAngle={5}
-                      dataKey="value"
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    >
-                      {pipelineDistribution.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px' }}
-                    />
-                    <Legend verticalAlign="bottom" height={36}/>
-                  </PieChart>
-                </ResponsiveContainer>
+                {mounted && (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={pipelineDistribution.filter(d => d.value > 0)}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={80}
+                        outerRadius={120}
+                        paddingAngle={5}
+                        dataKey="value"
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      >
+                        {pipelineDistribution.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px' }}
+                      />
+                      <Legend verticalAlign="bottom" height={36}/>
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
               </div>
             </div>
           </div>

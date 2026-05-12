@@ -18,9 +18,11 @@ import {
   Trash2,
   UserPlus,
   Users,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import Sidebar from '@/components/layout/Sidebar';
-import { addAdminUser, defaultAdminUsers, getAdminUsers, setAdminUserStatus, type AdminUser } from '@/lib/admin-users';
+import { addAdminUser, getAdminUsers, setAdminUserStatus, type AdminUser } from '@/lib/admin-users';
 import { isCurrentUserAdmin } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 
@@ -38,14 +40,20 @@ const pipelineStages = [
 ];
 
 export default function AdminPanelPage() {
-  const [users, setUsers] = useState<AdminUser[]>(defaultAdminUsers);
+  const [users, setUsers] = useState<AdminUser[]>([]);
   const [search, setSearch] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'users' | 'roles' | 'stages'>('users');
   const [hasAdminAccess, setHasAdminAccess] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
+
+  const fetchUsers = async () => {
+    const data = await getAdminUsers();
+    setUsers(data);
+  };
 
   useEffect(() => {
-    setUsers(getAdminUsers());
+    fetchUsers();
     setHasAdminAccess(isCurrentUserAdmin());
   }, []);
 
@@ -56,7 +64,6 @@ export default function AdminPanelPage() {
     return users.filter((user) => {
       return [
         user.fullName,
-        user.initials,
         user.email,
         user.role,
         user.phone,
@@ -65,31 +72,41 @@ export default function AdminPanelPage() {
     });
   }, [search, users]);
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsSaving(true);
 
     const form = event.currentTarget;
     const formData = new FormData(form);
-    const email = String(formData.get('email') ?? '').trim().toLocaleLowerCase('tr-TR');
-    const hasDuplicate = users.some((user) => user.email.toLocaleLowerCase('tr-TR') === email);
+    
+    const userData = {
+      fullName: String(formData.get('fullName')),
+      email: String(formData.get('email')),
+      password: String(formData.get('password')),
+      role: String(formData.get('role')),
+      phone: String(formData.get('phone') || ''),
+    };
 
-    if (hasDuplicate) {
+    try {
+      await addAdminUser(userData);
+      toast.success('Kullanıcı başarıyla kaydedildi.');
+      form.reset();
+      await fetchUsers();
+    } catch (error: any) {
+      toast.error(error.message || 'Kullanıcı kaydedilemedi.');
+    } finally {
       setIsSaving(false);
-      toast.error('Bu e-posta adresiyle kayıtlı kullanıcı var.');
-      return;
     }
-
-    addAdminUser(formData);
-    setUsers(getAdminUsers());
-    form.reset();
-    setIsSaving(false);
-    toast.success('Kullanıcı kaydedildi.');
   };
 
-  const handleStatusChange = (id: string, isActive: boolean) => {
-    const updatedUsers = setAdminUserStatus(id, isActive);
-    setUsers(updatedUsers);
+  const handleStatusChange = async (id: string, isActive: boolean) => {
+    const success = await setAdminUserStatus(id, isActive);
+    if (success) {
+      toast.success('Kullanıcı durumu güncellendi.');
+      await fetchUsers();
+    } else {
+      toast.error('Kullanıcı durumu güncellenemedi.');
+    }
   };
 
   if (!hasAdminAccess) {
@@ -164,15 +181,31 @@ export default function AdminPanelPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className={labelClass}>Isim Kisaltmasi</label>
-                    <input className={inputClass} name="initials" placeholder="AY" maxLength={4} required />
-                  </div>
-
-                  <div className="space-y-2">
                     <label className={labelClass}>E-posta</label>
                     <div className="relative">
                       <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                       <input className={`${inputClass} pl-11`} name="email" type="email" placeholder="kullanici@company.com" required />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className={labelClass}>Şifre</label>
+                    <div className="relative group">
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-blue-500 transition-colors" />
+                      <input 
+                        name="password"
+                        type={showPassword ? "text" : "password"} 
+                        required
+                        placeholder="••••••••"
+                        className={`${inputClass} pl-11 pr-12`}
+                      />
+                      <button 
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-white transition-colors"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
                     </div>
                   </div>
 
@@ -187,17 +220,9 @@ export default function AdminPanelPage() {
                   <div className="space-y-2">
                     <label className={labelClass}>Rol</label>
                     <select className={inputClass} name="role" defaultValue="Sales">
-                      <option>Admin</option>
-                      <option>Manager</option>
-                      <option>Sales</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className={labelClass}>Durum</label>
-                    <select className={inputClass} name="status" defaultValue="active">
-                      <option value="active">Aktif</option>
-                      <option value="passive">Pasif</option>
+                      <option value="Admin">Admin</option>
+                      <option value="Manager">Manager</option>
+                      <option value="Sales">Sales</option>
                     </select>
                   </div>
 
@@ -246,11 +271,11 @@ export default function AdminPanelPage() {
                           <td>
                             <div className="flex items-center gap-3">
                               <div className="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-white">
-                                {user.initials}
+                                {user.initials || user.fullName.charAt(0).toUpperCase()}
                               </div>
                               <div className="flex flex-col">
                                 <span className="text-white font-medium">{user.fullName}</span>
-                                <span className="text-xs text-slate-500">{user.initials} - {user.email}</span>
+                                <span className="text-xs text-slate-500">{user.email}</span>
                               </div>
                             </div>
                           </td>
@@ -280,6 +305,13 @@ export default function AdminPanelPage() {
                           </td>
                         </tr>
                       ))}
+                      {filteredUsers.length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="text-center py-8 text-slate-500">
+                            Kullanıcı bulunamadı.
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>

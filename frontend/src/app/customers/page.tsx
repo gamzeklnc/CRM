@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -14,8 +14,8 @@ import {
 } from 'lucide-react';
 import Sidebar from '@/components/layout/Sidebar';
 import Link from 'next/link';
-import { getCustomers, type CustomerListItem } from '@/lib/customers';
-import { getDeals, type DealItem } from '@/lib/deals';
+import { getCustomersFromDb, type CustomerListItem } from '@/lib/customers';
+import { getDealsFromDb, type DealItem } from '@/lib/deals';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -46,8 +46,10 @@ export default function CustomersPage() {
   const [deals, setDeals] = useState<DealItem[]>([]);
 
   useEffect(() => {
-    setCustomers(getCustomers());
-    setDeals(getDeals());
+    getCustomersFromDb()
+      .then(setCustomers)
+      .catch(() => setCustomers([]));
+    getDealsFromDb().then(setDeals).catch(() => setDeals([]));
   }, []);
 
   const filteredCustomers = useMemo(() => {
@@ -213,3 +215,6 @@ export default function CustomersPage() {
     </div>
   );
 }
+
+
+

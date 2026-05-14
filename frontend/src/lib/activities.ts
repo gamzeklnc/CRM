@@ -1,7 +1,10 @@
+import { api } from './api';
+
 export type ActivityItem = {
   id: string;
   type: string;
   user: string;
+  customerId?: string;
   company: string;
   subject: string;
   time: string;
@@ -15,98 +18,104 @@ export type ActivityItem = {
   dealCode?: string;
 };
 
-const STORAGE_KEY = 'solar-crm-activities';
-
-export const defaultActivities: ActivityItem[] = [];
-
-const createId = () => {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    return crypto.randomUUID();
-  }
-
-  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+type ApiActivity = {
+  id: string;
+  customerId: string;
+  customerName: string;
+  dealId: string | null;
+  dealCode: string | null;
+  projectName: string | null;
+  userName: string;
+  activityType: string;
+  subject: string;
+  description: string | null;
+  activityDate: string;
+  nextActionDate: string | null;
+  isCompleted: boolean;
+  status: ActivityItem['status'] | 'pending' | string;
+  completedAt: string | null;
+  createdAt: string;
 };
 
-const normalizeStatus = (value: FormDataEntryValue | null): ActivityItem['status'] => {
-  return value === 'pending' ? 'pending' : 'completed';
+const normalizeStatus = (value: ApiActivity['status'] | FormDataEntryValue | null): ActivityItem['status'] => {
+  if (value === 'completed' || value === 'cancelled') return value;
+  return 'planned';
 };
 
-const normalizeActivity = (activity: Partial<ActivityItem>): ActivityItem => {
-  const now = new Date().toISOString();
+const splitDateTime = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return { date: '', time: '' };
+
+  // Yerel saat dilimine göre yıl-ay-gün formatı (YYYY-MM-DD)
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  const dateStr = `${y}-${m}-${d}`;
 
   return {
-    id: activity.id ?? createId(),
-    type: activity.type ?? 'Arama',
-    user: activity.user ?? 'Sistem Yöneticisi',
-    company: activity.company ?? '',
-    subject: activity.subject ?? '',
-    time: activity.time ?? '',
-    date: activity.date ?? '',
-    status: activity.status ?? 'completed',
-    isCompleted: activity.isCompleted ?? (activity.status === 'completed'),
-    completedAt: activity.completedAt ?? null,
-    createdAt: activity.createdAt ?? now,
-    nextActionDate: activity.nextActionDate,
-    projectName: activity.projectName,
-    dealCode: activity.dealCode,
+    date: dateStr,
+    time: date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', hour12: false }),
   };
 };
 
-const readStoredActivities = () => {
-  if (typeof window === 'undefined') return defaultActivities;
-
-  const rawActivities = window.localStorage.getItem(STORAGE_KEY);
-  if (!rawActivities) return defaultActivities;
-
-  try {
-    const activities = JSON.parse(rawActivities) as Partial<ActivityItem>[];
-    return activities.map(normalizeActivity);
-  } catch {
-    return defaultActivities;
-  }
+const getActivityDateTimeValue = (formData: FormData) => {
+  const date = String(formData.get('date') ?? '').trim();
+  const time = String(formData.get('time') ?? '').trim() || '00:00';
+  // ISO formatında (Z olmadan) gönderiyoruz ki backend yerel saat olarak algılasın
+  return `${date}T${time}`;
 };
 
-const saveActivities = (activities: ActivityItem[]) => {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(activities));
+const mapApiActivity = (activity: ApiActivity): ActivityItem => {
+  const activityDate = splitDateTime(activity.activityDate);
+
+  return {
+    id: activity.id,
+    type: activity.activityType || 'Arama',
+    user: activity.userName || 'Sistem Yöneticisi',
+    customerId: activity.customerId,
+    company: activity.customerName,
+    subject: activity.subject,
+    time: activityDate.time,
+    date: activityDate.date,
+    status: normalizeStatus(activity.status),
+    isCompleted: activity.isCompleted,
+    completedAt: activity.completedAt,
+    createdAt: activity.createdAt,
+    nextActionDate: activity.nextActionDate ?? undefined,
+    projectName: activity.projectName ?? undefined,
+    dealCode: activity.dealCode ?? undefined,
+  };
 };
 
-export function getActivities() {
-  return readStoredActivities().sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+export async function getActivitiesFromDb() {
+  const response = await api.get('/Activities');
+  if (!response.ok) throw new Error('Aktiviteler veritabanından alınamadı.');
+
+  const activities = await response.json() as ApiActivity[];
+  return activities.map(mapApiActivity);
 }
 
-export function addActivity(formData: FormData) {
-  const activity: ActivityItem = {
-    id: createId(),
-    type: String(formData.get('type') ?? 'Arama'),
-    user: String(formData.get('user') ?? 'Sistem Yöneticisi').trim(),
-    company: String(formData.get('company') ?? '').trim(),
+export async function addActivityToDb(formData: FormData) {
+  const status = normalizeStatus(formData.get('status'));
+  const activityDate = getActivityDateTimeValue(formData);
+  const response = await api.post('/Activities', {
+    customerId: String(formData.get('customerId') ?? ''),
+    activityType: String(formData.get('type') ?? 'Arama'),
     subject: String(formData.get('subject') ?? '').trim(),
-    time: String(formData.get('time') ?? '').trim(),
-    date: String(formData.get('date') ?? '').trim(),
-    status: (formData.get('status') as ActivityItem['status']) ?? 'planned',
-    isCompleted: formData.get('status') === 'completed',
-    completedAt: formData.get('status') === 'completed' ? new Date().toISOString() : null,
-    createdAt: new Date().toISOString(),
-    nextActionDate: String(formData.get('nextActionDate') ?? '').trim() || undefined,
-  };
+    description: null,
+    activityDate,
+    nextActionDate: status === 'planned' ? activityDate : null,
+    isCompleted: status === 'completed',
+    status,
+  });
 
-  const activities = [activity, ...getActivities()];
-  saveActivities(activities);
-  return activity;
+  if (!response.ok) throw new Error('Aktivite veritabanına kaydedilemedi.');
+  return mapApiActivity(await response.json() as ApiActivity);
 }
 
-export function markActivityCompleted(id: string) {
-  const activities = getActivities();
-  const currentActivity = activities.find((activity) => activity.id === id);
-  if (!currentActivity) return null;
-
-  const updatedActivity: ActivityItem = {
-    ...currentActivity,
-    status: 'completed',
-    completedAt: new Date().toISOString(),
-  };
-
-  const updatedActivities = activities.map((activity) => activity.id === id ? updatedActivity : activity);
-  saveActivities(updatedActivities);
-  return updatedActivity;
+export async function markActivityCompletedInDb(id: string) {
+  const response = await api.post(`/Activities/${id}/complete`, {});
+  if (!response.ok) throw new Error('Aktivite tamamlandı olarak işaretlenemedi.');
+  return mapApiActivity(await response.json() as ApiActivity);
 }
+

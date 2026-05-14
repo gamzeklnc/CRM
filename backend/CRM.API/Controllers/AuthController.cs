@@ -1,4 +1,4 @@
-using CRM.Application.DTOs.Auth;
+﻿using CRM.Application.DTOs.Auth;
 using CRM.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -104,3 +104,4 @@ namespace CRM.API.Controllers
         }
     }
 }
+

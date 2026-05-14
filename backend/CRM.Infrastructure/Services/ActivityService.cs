@@ -37,8 +37,10 @@ namespace CRM.Infrastructure.Services
             {
                 CustomerId = dto.CustomerId, DealId = dto.DealId, UserId = userId,
                 ActivityType = dto.ActivityType, Subject = dto.Subject, Description = dto.Description,
-                ActivityDate = dto.ActivityDate, NextActionDate = dto.NextActionDate,
-                IsCompleted = dto.IsCompleted, Status = dto.Status
+                ActivityDate = dto.ActivityDate, 
+                NextActionDate = dto.NextActionDate,
+                IsCompleted = dto.IsCompleted, Status = dto.Status,
+                CompletedAt = dto.IsCompleted ? DateTime.Now : null
             };
             _context.Activities.Add(activity);
             await _context.SaveChangesAsync();
@@ -56,8 +58,19 @@ namespace CRM.Infrastructure.Services
             var activity = await _context.Activities.FindAsync(id);
             if (activity == null) return null;
             activity.ActivityType = dto.ActivityType; activity.Subject = dto.Subject;
-            activity.Description = dto.Description; activity.ActivityDate = dto.ActivityDate;
+            activity.Description = dto.Description; 
+            activity.ActivityDate = dto.ActivityDate;
             activity.NextActionDate = dto.NextActionDate;
+            
+            if (dto.IsCompleted && !activity.IsCompleted)
+            {
+                activity.CompletedAt = DateTime.Now;
+            }
+            else if (!dto.IsCompleted)
+            {
+                activity.CompletedAt = null;
+            }
+
             activity.IsCompleted = dto.IsCompleted;
             activity.Status = dto.Status;
             await _context.SaveChangesAsync();
@@ -88,7 +101,8 @@ namespace CRM.Infrastructure.Services
             DealId = a.DealId, DealCode = a.Deal?.DealCode, ProjectName = a.Deal?.ProjectName,
             UserId = a.UserId, UserName = a.User?.FullName ?? "", ActivityType = a.ActivityType,
             Subject = a.Subject, Description = a.Description, ActivityDate = a.ActivityDate,
-            NextActionDate = a.NextActionDate, IsCompleted = a.IsCompleted, Status = a.Status, CreatedAt = a.CreatedAt
+            NextActionDate = a.NextActionDate, IsCompleted = a.IsCompleted, Status = a.Status, 
+            CompletedAt = a.CompletedAt, CreatedAt = a.CreatedAt
         };
     }
 }

@@ -15,7 +15,8 @@ namespace CRM.Domain.Entities
         public DateTime? NextActionDate { get; set; }
         public bool IsCompleted { get; set; }
         public string Status { get; set; } = "planned"; // planned, completed, cancelled
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime? CompletedAt { get; set; }
+        public DateTime CreatedAt { get; set; } = DateTime.Now;
 
         // Navigation
         public Customer? Customer { get; set; }

@@ -42,5 +42,25 @@ namespace CRM.API.Controllers
             var activity = await _activityService.CreateAsync(dto, userId);
             return Ok(activity);
         }
+
+        [HttpPost("{id}/complete")]
+        public async Task<IActionResult> Complete(Guid id)
+        {
+            var current = await _activityService.GetByIdAsync(id);
+            if (current == null) return NotFound();
+
+            var updated = await _activityService.UpdateAsync(id, new UpdateActivityDto
+            {
+                ActivityType = current.ActivityType,
+                Subject = current.Subject,
+                Description = current.Description,
+                ActivityDate = current.ActivityDate,
+                NextActionDate = current.NextActionDate,
+                IsCompleted = true,
+                Status = "completed"
+            });
+
+            return updated == null ? NotFound() : Ok(updated);
+        }
     }
 }

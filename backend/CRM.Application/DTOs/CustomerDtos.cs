@@ -11,12 +11,17 @@ namespace CRM.Application.DTOs
         public string? City { get; set; }
         public string? Sector { get; set; }
         public string? Address { get; set; }
+        public Guid? ResponsibleUserId { get; set; }
         public string CreatedByName { get; set; } = string.Empty;
         public string CreatedByShortName { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
         public int ContactCount { get; set; }
         public int DealCount { get; set; }
+        public string? PrimaryContactName { get; set; }
+        public string? PrimaryContactTitle { get; set; }
+        public string? PrimaryContactEmail { get; set; }
+        public string? PrimaryContactPhone { get; set; }
     }
 
     public class CreateCustomerDto
@@ -28,6 +33,11 @@ namespace CRM.Application.DTOs
         public string? City { get; set; }
         public string? Sector { get; set; }
         public string? Address { get; set; }
+        public Guid? ResponsibleUserId { get; set; }
+        public string? ContactName { get; set; }
+        public string? ContactTitle { get; set; }
+        public string? Email { get; set; }
+        public string? Phone { get; set; }
     }
 
     public class UpdateCustomerDto
@@ -39,5 +49,12 @@ namespace CRM.Application.DTOs
         public string? City { get; set; }
         public string? Sector { get; set; }
         public string? Address { get; set; }
+        public Guid? ResponsibleUserId { get; set; }
+        public string? ContactName { get; set; }
+        public string? ContactTitle { get; set; }
+        public string? Email { get; set; }
+        public string? Phone { get; set; }
     }
 }
+
+

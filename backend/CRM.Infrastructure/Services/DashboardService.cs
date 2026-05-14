@@ -19,8 +19,8 @@ namespace CRM.Infrastructure.Services
             if (startDate.HasValue) dealQuery = dealQuery.Where(d => d.CreatedAt >= startDate.Value);
             if (endDate.HasValue) dealQuery = dealQuery.Where(d => d.CreatedAt <= endDate.Value);
             if (salesUserId.HasValue) dealQuery = dealQuery.Where(d => d.SalesUserId == salesUserId.Value);
-            if (!string.IsNullOrEmpty(city)) dealQuery = dealQuery.Where(d => d.Customer.City == city);
-            if (!string.IsNullOrEmpty(sector)) dealQuery = dealQuery.Where(d => d.Customer.Sector == sector);
+            if (!string.IsNullOrEmpty(city)) dealQuery = dealQuery.Where(d => d.Customer != null && d.Customer.City == city);
+            if (!string.IsNullOrEmpty(sector)) dealQuery = dealQuery.Where(d => d.Customer != null && d.Customer.Sector == sector);
             if (customerId.HasValue) dealQuery = dealQuery.Where(d => d.CustomerId == customerId.Value);
 
             var deals = await dealQuery.ToListAsync();

@@ -12,8 +12,8 @@ namespace CRM.Domain.Entities
         public string? Sector { get; set; }
         public string? Address { get; set; }
         public Guid CreatedBy { get; set; }
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; } = DateTime.Now;
+        public DateTime UpdatedAt { get; set; } = DateTime.Now;
 
         // Navigation
         public User? Creator { get; set; }

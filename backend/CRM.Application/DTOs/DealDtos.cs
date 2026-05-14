@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace CRM.Application.DTOs
 {
@@ -101,3 +101,4 @@ namespace CRM.Application.DTOs
         public DateTime ClosedDate { get; set; }
     }
 }
+

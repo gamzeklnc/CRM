@@ -1,3 +1,5 @@
+import { api } from './api';
+
 export type CustomerListItem = {
   id: string;
   name: string;
@@ -20,144 +22,106 @@ export type CustomerListItem = {
   updatedAt: string;
 };
 
-const STORAGE_KEY = 'solar-crm-customers';
-const DEMO_CUSTOMER_NAMES = new Set(['ornek firma', 'abc solar energy', 'jinko']);
+type ApiCustomer = {
+  id: string;
+  companyName: string;
+  cariCode: string | null;
+  taxNumber: string | null;
+  city: string | null;
+  sector: string | null;
+  address: string | null;
+  createdByName: string;
+  createdAt: string;
+  updatedAt: string;
+  contactCount: number;
+  dealCount: number;
+  primaryContactName: string | null;
+  primaryContactTitle: string | null;
+  primaryContactEmail: string | null;
+  primaryContactPhone: string | null;
+};
 
 const normalizeOptional = (value: FormDataEntryValue | null) => {
   const text = String(value ?? '').trim();
   return text.length > 0 ? text : null;
 };
 
-const numberFromForm = (value: FormDataEntryValue | null) => {
-  const numericValue = Number(value ?? 0);
-  return Number.isFinite(numericValue) && numericValue > 0 ? numericValue : 0;
-};
+const mapApiCustomer = (customer: ApiCustomer): CustomerListItem => ({
+  id: customer.id,
+  name: customer.companyName,
+  code: customer.cariCode,
+  tax: customer.taxNumber,
+  industry: customer.sector,
+  contactName: customer.primaryContactName,
+  contactTitle: customer.primaryContactTitle,
+  email: customer.primaryContactEmail,
+  phone: customer.primaryContactPhone,
+  city: customer.city,
+  district: null,
+  website: null,
+  address: customer.address,
+  notes: null,
+  contacts: customer.contactCount,
+  deals: customer.dealCount,
+  owner: customer.createdByName || 'Sistem Yöneticisi',
+  createdAt: customer.createdAt,
+  updatedAt: customer.updatedAt,
+});
 
-const createId = () => {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    return crypto.randomUUID();
-  }
+export async function getCustomersFromDb() {
+  const response = await api.get('/Customers');
+  if (!response.ok) throw new Error('Müşteriler veritabanından alınamadı.');
 
-  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-};
-
-const normalizeCustomer = (customer: Partial<CustomerListItem>): CustomerListItem => {
-  const now = new Date().toISOString();
-
-  return {
-    id: customer.id ?? createId(),
-    name: customer.name ?? '',
-    code: customer.code ?? null,
-    tax: customer.tax ?? null,
-    industry: customer.industry ?? null,
-    contactName: customer.contactName ?? null,
-    contactTitle: customer.contactTitle ?? null,
-    email: customer.email ?? null,
-    phone: customer.phone ?? null,
-    city: customer.city ?? null,
-    district: customer.district ?? null,
-    website: customer.website ?? null,
-    address: customer.address ?? null,
-    notes: customer.notes ?? null,
-    contacts: customer.contacts ?? (customer.contactName ? 1 : 0),
-    deals: customer.deals ?? 0,
-    owner: customer.owner ?? 'Gamze K.',
-    createdAt: customer.createdAt ?? now,
-    updatedAt: customer.updatedAt ?? customer.createdAt ?? now,
-  };
-};
-
-const isDemoCustomer = (customer: CustomerListItem) => {
-  const name = customer.name.trim().toLocaleLowerCase('tr-TR').replace('ö', 'o');
-  return DEMO_CUSTOMER_NAMES.has(name);
-};
-
-const readStoredCustomers = () => {
-  if (typeof window === 'undefined') return [];
-
-  const rawCustomers = window.localStorage.getItem(STORAGE_KEY);
-  if (!rawCustomers) return [];
-
-  try {
-    const customers = JSON.parse(rawCustomers) as Partial<CustomerListItem>[];
-    const normalizedCustomers = customers.map(normalizeCustomer);
-    const realCustomers = normalizedCustomers.filter((customer) => !isDemoCustomer(customer));
-    if (realCustomers.length !== normalizedCustomers.length) saveCustomers(realCustomers);
-    return realCustomers;
-  } catch {
-    return [];
-  }
-};
-
-const saveCustomers = (customers: CustomerListItem[]) => {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(customers));
-};
-
-export function getCustomers() {
-  return readStoredCustomers().sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+  const customers = await response.json() as ApiCustomer[];
+  return customers.map(mapApiCustomer);
 }
 
-export function getCustomerById(id: string) {
-  return getCustomers().find((customer) => customer.id === id) ?? null;
+export async function getCustomerByIdFromDb(id: string) {
+  const response = await api.get(`/Customers/${id}`);
+  if (!response.ok) return null;
+
+  return mapApiCustomer(await response.json() as ApiCustomer);
 }
 
-export function addCustomer(formData: FormData) {
-  const now = new Date().toISOString();
-  const contactName = normalizeOptional(formData.get('contactName'));
-  const customer: CustomerListItem = {
-    id: createId(),
-    name: String(formData.get('companyName') ?? '').trim(),
-    code: normalizeOptional(formData.get('customerCode')),
-    tax: normalizeOptional(formData.get('taxNumber')),
-    industry: normalizeOptional(formData.get('industry')),
-    contactName,
+export async function addCustomerToDb(formData: FormData) {
+  const response = await api.post('/Customers', {
+    companyName: String(formData.get('companyName') ?? '').trim(),
+    cariCode: normalizeOptional(formData.get('customerCode')),
+    taxNumber: normalizeOptional(formData.get('taxNumber')),
+    city: normalizeOptional(formData.get('city')),
+    sector: normalizeOptional(formData.get('industry')),
+    address: normalizeOptional(formData.get('address')),
+    responsibleUserId: normalizeOptional(formData.get('responsibleUserId')),
+    contactName: normalizeOptional(formData.get('contactName')),
     contactTitle: normalizeOptional(formData.get('contactTitle')),
     email: normalizeOptional(formData.get('email')),
     phone: normalizeOptional(formData.get('phone')),
-    city: normalizeOptional(formData.get('city')),
-    district: normalizeOptional(formData.get('district')),
-    website: normalizeOptional(formData.get('website')),
-    address: normalizeOptional(formData.get('address')),
-    notes: normalizeOptional(formData.get('notes')),
-    contacts: contactName ? 1 : 0,
-    deals: 0,
-    owner: String(formData.get('owner') ?? 'Gamze K.'),
-    createdAt: now,
-    updatedAt: now,
-  };
+  });
 
-  const customers = [customer, ...getCustomers()];
-  saveCustomers(customers);
-  return customer;
+  if (!response.ok) {
+    const error = await response.json().catch(() => null);
+    throw new Error(error?.message ?? 'Müşteri veritabanına kaydedilemedi.');
+  }
+
+  return mapApiCustomer(await response.json() as ApiCustomer);
 }
 
-export function updateCustomer(id: string, formData: FormData) {
-  const customers = getCustomers();
-  const currentCustomer = customers.find((customer) => customer.id === id);
-  if (!currentCustomer) return null;
-
-  const contactName = normalizeOptional(formData.get('contactName'));
-  const updatedCustomer: CustomerListItem = {
-    ...currentCustomer,
-    name: String(formData.get('companyName') ?? '').trim(),
-    code: normalizeOptional(formData.get('customerCode')),
-    tax: normalizeOptional(formData.get('taxNumber')),
-    industry: normalizeOptional(formData.get('industry')),
-    contactName,
+export async function updateCustomerInDb(id: string, formData: FormData) {
+  const response = await api.put(`/Customers/${id}`, {
+    companyName: String(formData.get('companyName') ?? '').trim(),
+    cariCode: normalizeOptional(formData.get('customerCode')),
+    taxNumber: normalizeOptional(formData.get('taxNumber')),
+    city: normalizeOptional(formData.get('city')),
+    sector: normalizeOptional(formData.get('industry')),
+    address: normalizeOptional(formData.get('address')),
+    responsibleUserId: normalizeOptional(formData.get('responsibleUserId')),
+    contactName: normalizeOptional(formData.get('contactName')),
     contactTitle: normalizeOptional(formData.get('contactTitle')),
     email: normalizeOptional(formData.get('email')),
     phone: normalizeOptional(formData.get('phone')),
-    city: normalizeOptional(formData.get('city')),
-    district: normalizeOptional(formData.get('district')),
-    website: normalizeOptional(formData.get('website')),
-    address: normalizeOptional(formData.get('address')),
-    notes: normalizeOptional(formData.get('notes')),
-    contacts: contactName ? Math.max(currentCustomer.contacts, 1) : 0,
-    deals: numberFromForm(formData.get('deals')),
-    owner: String(formData.get('owner') ?? currentCustomer.owner),
-    updatedAt: new Date().toISOString(),
-  };
+  });
 
-  saveCustomers(customers.map((customer) => customer.id === id ? updatedCustomer : customer));
-  return updatedCustomer;
+  if (!response.ok) return null;
+  return mapApiCustomer(await response.json() as ApiCustomer);
 }
+

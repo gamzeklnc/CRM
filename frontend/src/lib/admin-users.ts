@@ -1,4 +1,4 @@
-import { api } from './api';
+﻿import { api } from './api';
 
 export type AdminUser = {
   id: string;
@@ -65,3 +65,4 @@ export async function updateAdminUser(id: string, data: any) {
   }
   return await response.json();
 }
+

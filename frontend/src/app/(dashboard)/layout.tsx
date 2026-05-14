@@ -1,4 +1,4 @@
-import Sidebar from "@/components/layout/Sidebar";
+﻿import Sidebar from "@/components/layout/Sidebar";
 import AuthGuard from "@/components/auth/AuthGuard";
 import { getCurrentUser } from "@/lib/auth";
 
@@ -35,3 +35,4 @@ export default function DashboardLayout({
     </AuthGuard>
   );
 }
+

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { 
@@ -27,8 +27,8 @@ import {
   YAxis,
 } from 'recharts';
 import Sidebar from '@/components/layout/Sidebar';
-import { getDeals, type DealItem, dealStages } from '@/lib/deals';
-import { getCustomers } from '@/lib/customers';
+import { getDealsFromDb, type DealItem, dealStages } from '@/lib/deals';
+import { getCustomersFromDb } from '@/lib/customers';
 import { getAdminUsers } from '@/lib/admin-users';
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#F43F5E', '#6366F1', '#94A3B8'];
@@ -86,8 +86,8 @@ export default function ReportsPage() {
   useEffect(() => {
     setMounted(true);
     const loadData = async () => {
-      setDeals(getDeals());
-      setCustomers(getCustomers());
+      setDeals(await getDealsFromDb());
+      setCustomers(await getCustomersFromDb());
       try {
         const adminUsers = await getAdminUsers();
         setUsers(adminUsers);
@@ -164,7 +164,7 @@ export default function ReportsPage() {
         'EPC ORTAĞI': d.epcPartner || '-',
         'GÜNCELLEME': d.currentUpdate || '-',
         'SON TEMAS': d.lastContactDate || '-',
-        'GÜNCEL DURUM / NOTLAR': d.notes?.map(n => n.text).join(' | ') || '-'
+        'GÜNCEL DURUM / NOTLAR': d.noteHistory?.map(n => n.text).join(' | ') || d.notes || '-'
       };
     });
     exportToExcel(data, 'pipeline_raporu');
@@ -265,7 +265,7 @@ export default function ReportsPage() {
                       <Tooltip 
                         contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px' }}
                         itemStyle={{ color: '#fff' }}
-                        formatter={(val: number) => `$${val.toLocaleString()}`}
+                        formatter={(val) => `$${Number(val ?? 0).toLocaleString()}`}
                       />
                       <Bar dataKey="totalValue" radius={[0, 4, 4, 0]} name="Toplam Kazanılan Değer">
                         {salesPerformance.map((entry, index) => (
@@ -301,7 +301,7 @@ export default function ReportsPage() {
                         outerRadius={120}
                         paddingAngle={5}
                         dataKey="value"
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
                       >
                         {pipelineDistribution.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -372,3 +372,11 @@ export default function ReportsPage() {
     </div>
   );
 }
+
+
+
+
+
+
+
+

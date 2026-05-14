@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState } from 'react';
 import { Mail, Lock, Eye, EyeOff, Loader2, ArrowRight } from 'lucide-react';
@@ -149,3 +149,5 @@ export default function LoginPage() {
     </div>
   );
 }
+
+

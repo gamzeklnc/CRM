@@ -1,4 +1,4 @@
-using CRM.Application.DTOs.Auth;
+﻿using CRM.Application.DTOs.Auth;
 using CRM.Application.Interfaces;
 using CRM.Domain.Entities;
 using CRM.Infrastructure.Data;
@@ -146,3 +146,4 @@ namespace CRM.Infrastructure.Services
         };
     }
 }
+

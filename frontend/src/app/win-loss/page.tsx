@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -26,7 +26,7 @@ import {
 } from 'recharts';
 import Sidebar from '@/components/layout/Sidebar';
 import { cn } from '@/lib/utils';
-import { getDeals, type DealItem } from '@/lib/deals';
+import { getDealsFromDb, type DealItem } from '@/lib/deals';
 
 type ResultFilter = 'all' | 'won' | 'lost';
 
@@ -57,7 +57,7 @@ export default function WinLossPage() {
   const [filter, setFilter] = useState<ResultFilter>('all');
 
   useEffect(() => {
-    setDeals(getDeals());
+    getDealsFromDb().then(setDeals).catch(() => setDeals([]));
   }, []);
 
   useEffect(() => {
@@ -369,3 +369,7 @@ export default function WinLossPage() {
     </div>
   );
 }
+
+
+
+

@@ -1,6 +1,6 @@
-"use client";
+﻿"use client";
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
@@ -16,7 +16,8 @@ import {
   Globe,
 } from 'lucide-react';
 import Sidebar from '@/components/layout/Sidebar';
-import { addCustomer } from '@/lib/customers';
+import { getAdminUsers, type AdminUser } from '@/lib/admin-users';
+import { addCustomerToDb } from '@/lib/customers';
 
 const inputClass = "w-full bg-slate-900/60 border border-border-subtle rounded-xl px-4 py-3 text-sm text-white outline-none transition-all placeholder:text-slate-600 focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20";
 const labelClass = "text-sm font-medium text-slate-300";
@@ -24,19 +25,32 @@ const labelClass = "text-sm font-medium text-slate-300";
 export default function NewCustomerPage() {
   const router = useRouter();
   const [isSaving, setIsSaving] = useState(false);
+  const [users, setUsers] = useState<AdminUser[]>([]);
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  useEffect(() => {
+    getAdminUsers()
+      .then((data) => setUsers(data.filter((user) => user.isActive)))
+      .catch(() => {
+        setUsers([]);
+        toast.error('Hesap sorumluları alınamadı.');
+      });
+  }, []);
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsSaving(true);
 
     const formData = new FormData(event.currentTarget);
-    addCustomer(formData);
-
-    setIsSaving(false);
-    toast.success('Müşteri kaydı oluşturuldu.');
-    router.push('/customers');
+    try {
+      await addCustomerToDb(formData);
+      toast.success('Müşteri kaydı veritabanına kaydedildi.');
+      router.push('/customers');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Müşteri kaydedilemedi.');
+    } finally {
+      setIsSaving(false);
+    }
   };
-
   return (
     <div className="flex min-h-screen bg-main-bg">
       <Sidebar />
@@ -94,11 +108,13 @@ export default function NewCustomerPage() {
 
                 <div className="space-y-2">
                   <label className={labelClass}>Hesap Sorumlusu</label>
-                  <select className={inputClass} name="owner" defaultValue="Gamze K.">
-                    <option>Gamze K.</option>
-                    <option>John Doe</option>
-                    <option>Sarah C.</option>
-                    <option>Michael S.</option>
+                  <select className={inputClass} name="responsibleUserId" defaultValue="" required disabled={users.length === 0}>
+                    <option value="" disabled>{users.length === 0 ? 'Kayıtlı aktif kullanıcı yok' : 'Hesap sorumlusu seçin'}</option>
+                    {users.map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.fullName} ({user.initials})
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -188,7 +204,7 @@ export default function NewCustomerPage() {
             </Link>
             <button
               type="submit"
-              disabled={isSaving}
+              disabled={isSaving || users.length === 0}
               className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold transition-all shadow-lg shadow-blue-500/20 disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
             >
               <Save className="w-4 h-4" />
@@ -200,3 +216,6 @@ export default function NewCustomerPage() {
     </div>
   );
 }
+
+
+

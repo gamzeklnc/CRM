@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -16,9 +16,9 @@ import {
   User,
 } from 'lucide-react';
 import Sidebar from '@/components/layout/Sidebar';
-import { getActivities, type ActivityItem } from '@/lib/activities';
-import { getCustomerById, type CustomerListItem, updateCustomer } from '@/lib/customers';
-import { getDeals, type DealItem } from '@/lib/deals';
+import { getActivitiesFromDb, type ActivityItem } from '@/lib/activities';
+import { getCustomerByIdFromDb, type CustomerListItem, updateCustomerInDb } from '@/lib/customers';
+import { getDealsFromDb, type DealItem } from '@/lib/deals';
 
 const ownerInitials = (owner: string) => {
   return owner
@@ -58,17 +58,17 @@ export default function CustomerDetailPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    setCustomer(getCustomerById(params.id));
-    setDeals(getDeals());
-    setActivities(getActivities());
+    getCustomerByIdFromDb(params.id).then(setCustomer);
+    getDealsFromDb().then(setDeals).catch(() => setDeals([]));
+    getActivitiesFromDb().then(setActivities).catch(() => setActivities([]));
   }, [params.id]);
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsSaving(true);
 
     const formData = new FormData(event.currentTarget);
-    const updatedCustomer = updateCustomer(params.id, formData);
+    const updatedCustomer = await updateCustomerInDb(params.id, formData);
     setIsSaving(false);
 
     if (!updatedCustomer) {
@@ -383,3 +383,6 @@ export default function CustomerDetailPage() {
     </div>
   );
 }
+
+
+

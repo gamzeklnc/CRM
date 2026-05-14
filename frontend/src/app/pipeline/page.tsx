@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -20,7 +20,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import Sidebar from '@/components/layout/Sidebar';
 import { cn } from '@/lib/utils';
-import { addDealNote, dealStages, getDeals, getLossReasonOptions, markDealAsLost, markDealAsWon, updateDealStage, type DealItem, type DealStageName, lossReasonList } from '@/lib/deals';
+import { closeDealInDb, dealStages, getDealsFromDb, getLossReasonOptionsFromDb, updateDealStageInDb, type DealItem, type DealStageName, lossReasonList } from '@/lib/deals';
 
 
 const formatCurrency = (value: number) => `$${Math.round(value).toLocaleString('en-US')}`;
@@ -68,8 +68,8 @@ export default function PipelinePage() {
   const [recentlyDragged, setRecentlyDragged] = useState(false);
 
   useEffect(() => {
-    setDeals(getDeals());
-    setLossReasonOptions(getLossReasonOptions());
+    getDealsFromDb().then(setDeals).catch(() => setDeals([]));
+    getLossReasonOptionsFromDb().then(setLossReasonOptions).catch(() => setLossReasonOptions([]));
   }, []);
 
   const filteredDeals = useMemo(() => {
@@ -107,21 +107,9 @@ export default function PipelinePage() {
 
   const handleAddNote = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!selectedDeal) return;
-
-    const updatedDeal = addDealNote(selectedDeal.id, noteText);
-    if (!updatedDeal) {
-      toast.error('Not kaydedilemedi.');
-      return;
-    }
-
-    setDeals(getDeals());
-    setSelectedDeal(updatedDeal);
-    setNoteText('');
-    toast.success('Not eklendi.');
+    toast.error('Notlar artık database üzerinden yönetilecek; bu işlem için backend not endpointi gerekiyor.');
   };
-
-  const handleMarkAsWon = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleMarkAsWon = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!selectedDeal) return;
 
@@ -130,26 +118,17 @@ export default function PipelinePage() {
       return;
     }
 
-    const finalPrice = Number(wonFinalPrice || selectedDeal.valueAmount);
-    const updatedDeal = markDealAsWon(selectedDeal.id, {
-      wonReason: wonReason.trim(),
-      finalPrice: Number.isFinite(finalPrice) ? finalPrice : selectedDeal.valueAmount,
-      deliveryDate: wonDeliveryDate,
-      epcPartner: wonEpcPartner,
-      closedDate: wonClosedDate,
-    });
-    if (!updatedDeal) {
-      toast.error('Deal güncellenemedi.');
-      return;
+    try {
+      const updatedDeal = await closeDealInDb(selectedDeal.id, 'won', { closedDate: wonClosedDate });
+      setDeals(await getDealsFromDb());
+      setSelectedDeal(updatedDeal);
+      closeWonForm();
+      toast.success(`${updatedDeal.id} kazanıldı olarak işaretlendi.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Deal güncellenemedi.');
     }
-
-    setDeals(getDeals());
-    setSelectedDeal(updatedDeal);
-    closeWonForm();
-    toast.success(`${updatedDeal.id} kazanıldı olarak işaretlendi.`);
   };
-
-  const handleMarkAsLost = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleMarkAsLost = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!selectedDeal) return;
 
@@ -163,22 +142,21 @@ export default function PipelinePage() {
       return;
     }
 
-    const updatedDeal = markDealAsLost(selectedDeal.id, normalizedReason, lostCompetitorName, {
-      lossLesson,
-      closedDate: lossClosedDate,
-    });
-    if (!updatedDeal) {
-      toast.error('Deal guncellenemedi.');
-      return;
+    try {
+      const updatedDeal = await closeDealInDb(selectedDeal.id, 'lost', {
+        lossReason: normalizedReason,
+        competitorName: lostCompetitorName,
+        closedDate: lossClosedDate,
+      });
+      setDeals(await getDealsFromDb());
+      setLossReasonOptions(await getLossReasonOptionsFromDb());
+      setSelectedDeal(updatedDeal);
+      closeLossForm();
+      toast.success(`${updatedDeal.id} kaybedildi olarak işaretlendi.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Deal güncellenemedi.');
     }
-
-    setDeals(getDeals());
-    setLossReasonOptions(getLossReasonOptions());
-    setSelectedDeal(updatedDeal);
-    closeLossForm();
-    toast.success(`${updatedDeal.id} kaybedildi olarak isaretlendi.`);
   };
-
   const handleDragStart = (event: React.DragEvent<HTMLDivElement>, dealId: string) => {
     setDraggedDealId(dealId);
     setRecentlyDragged(true);
@@ -192,7 +170,7 @@ export default function PipelinePage() {
     window.setTimeout(() => setRecentlyDragged(false), 120);
   };
 
-  const handleDrop = (event: React.DragEvent<HTMLDivElement>, stageName: DealStageName) => {
+  const handleDrop = async (event: React.DragEvent<HTMLDivElement>, stageName: DealStageName) => {
     event.preventDefault();
 
     const dealId = event.dataTransfer.getData('text/plain') || draggedDealId;
@@ -223,13 +201,13 @@ export default function PipelinePage() {
       return;
     }
 
-    const updatedDeal = updateDealStage(dealId, stageName);
+    const updatedDeal = await updateDealStageInDb(dealId, stageName);
     if (!updatedDeal) {
       toast.error('Deal asamasi guncellenemedi.');
       return;
     }
 
-    setDeals(getDeals());
+    getDealsFromDb().then(setDeals).catch(() => setDeals([]));
     if (selectedDeal?.id === updatedDeal.id) setSelectedDeal(updatedDeal);
     toast.success(`${updatedDeal.id} ${stageName} asamasina tasindi.`);
   };
@@ -246,7 +224,7 @@ export default function PipelinePage() {
               <button 
                 onClick={() => {
                   if (confirm('Tüm yerel veriler temizlenecek. Emin misiniz?')) {
-                    localStorage.clear();
+                    toast.error('Veriler artık localStorage yerine database üzerinde tutuluyor.');
                     window.location.reload();
                   }
                 }}
@@ -810,3 +788,7 @@ export default function PipelinePage() {
     </div>
   );
 }
+
+
+
+

@@ -44,10 +44,11 @@ namespace CRM.Infrastructure.Services
         {
             var normalized = NormalizeForDuplicateCheck(dto.CompanyName);
             var exists = await _context.Customers
-                .AnyAsync(c => NormalizeForDuplicateCheck(c.CompanyName) == normalized);
+                .AnyAsync(c => c.CompanyName.Replace(" ", "").ToUpper() == normalized);
 
             if (exists) throw new InvalidOperationException($"'{dto.CompanyName}' (veya benzeri) zaten kayıtlı.");
 
+            var responsibleUserId = dto.ResponsibleUserId ?? userId;
             var customer = new Customer
             {
                 CompanyName = dto.CompanyName.Trim(),
@@ -56,9 +57,24 @@ namespace CRM.Infrastructure.Services
                 City = NormalizeOptional(dto.City),
                 Sector = NormalizeOptional(dto.Sector),
                 Address = NormalizeOptional(dto.Address),
-                CreatedBy = userId
+                CreatedBy = responsibleUserId
             };
             _context.Customers.Add(customer);
+
+            if (!string.IsNullOrWhiteSpace(dto.ContactName) || !string.IsNullOrWhiteSpace(dto.Email) || !string.IsNullOrWhiteSpace(dto.Phone))
+            {
+                var contact = new Contact
+                {
+                    CustomerId = customer.Id,
+                    FullName = dto.ContactName ?? "İsimsiz Yetkili",
+                    Title = dto.ContactTitle,
+                    Email = dto.Email,
+                    Phone = dto.Phone,
+                    IsPrimary = true
+                };
+                _context.Contacts.Add(contact);
+            }
+
             await _context.SaveChangesAsync();
 
             return await GetByIdAsync(customer.Id) ?? MapToDto(customer);
@@ -71,7 +87,7 @@ namespace CRM.Infrastructure.Services
 
             var normalized = NormalizeForDuplicateCheck(dto.CompanyName);
             var exists = await _context.Customers
-                .AnyAsync(c => NormalizeForDuplicateCheck(c.CompanyName) == normalized && c.Id != id);
+                .AnyAsync(c => c.CompanyName.Replace(" ", "").ToUpper() == normalized && c.Id != id);
             
             if (exists) throw new InvalidOperationException($"'{dto.CompanyName}' (veya benzeri) zaten kayıtlı.");
 
@@ -81,7 +97,33 @@ namespace CRM.Infrastructure.Services
             customer.City = NormalizeOptional(dto.City);
             customer.Sector = NormalizeOptional(dto.Sector);
             customer.Address = NormalizeOptional(dto.Address);
+            if (dto.ResponsibleUserId.HasValue) customer.CreatedBy = dto.ResponsibleUserId.Value;
             customer.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            // Birincil iletişim kişisini bul veya oluştur
+            var primaryContact = await _context.Contacts.FirstOrDefaultAsync(ct => ct.CustomerId == id && ct.IsPrimary);
+            if (primaryContact != null)
+            {
+                primaryContact.FullName = dto.ContactName ?? primaryContact.FullName;
+                primaryContact.Title = dto.ContactTitle;
+                primaryContact.Email = dto.Email;
+                primaryContact.Phone = dto.Phone;
+            }
+            else if (!string.IsNullOrWhiteSpace(dto.ContactName) || !string.IsNullOrWhiteSpace(dto.Email) || !string.IsNullOrWhiteSpace(dto.Phone))
+            {
+                var contact = new Contact
+                {
+                    CustomerId = id,
+                    FullName = dto.ContactName ?? "İsimsiz Yetkili",
+                    Title = dto.ContactTitle,
+                    Email = dto.Email,
+                    Phone = dto.Phone,
+                    IsPrimary = true
+                };
+                _context.Contacts.Add(contact);
+            }
 
             await _context.SaveChangesAsync();
             return await GetByIdAsync(id);
@@ -123,7 +165,12 @@ namespace CRM.Infrastructure.Services
             CreatedAt = c.CreatedAt,
             UpdatedAt = c.UpdatedAt,
             ContactCount = c.Contacts?.Count ?? 0,
-            DealCount = c.Deals?.Count ?? 0
+            DealCount = c.Deals?.Count ?? 0,
+            PrimaryContactName = c.Contacts?.FirstOrDefault(ct => ct.IsPrimary)?.FullName,
+            PrimaryContactTitle = c.Contacts?.FirstOrDefault(ct => ct.IsPrimary)?.Title,
+            PrimaryContactEmail = c.Contacts?.FirstOrDefault(ct => ct.IsPrimary)?.Email,
+            PrimaryContactPhone = c.Contacts?.FirstOrDefault(ct => ct.IsPrimary)?.Phone
         };
     }
 }
+

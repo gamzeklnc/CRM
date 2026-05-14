@@ -1,4 +1,4 @@
-using CRM.Application.DTOs;
+﻿using CRM.Application.DTOs;
 using CRM.Application.Interfaces;
 using CRM.Domain.Entities;
 using CRM.Infrastructure.Data;
@@ -24,7 +24,7 @@ namespace CRM.Infrastructure.Services
             if (!string.IsNullOrWhiteSpace(search))
                 query = query.Where(d => d.ProjectName.Contains(search) ||
                     d.DealCode.Contains(search) ||
-                    d.Customer.CompanyName.Contains(search));
+                    (d.Customer != null && d.Customer.CompanyName.Contains(search)));
 
             if (!string.IsNullOrWhiteSpace(status))
                 query = query.Where(d => d.Status == status);
@@ -235,3 +235,4 @@ namespace CRM.Infrastructure.Services
         };
     }
 }
+

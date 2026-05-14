@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from 'next/link';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -29,8 +29,8 @@ import {
   YAxis,
 } from 'recharts';
 import Sidebar from '@/components/layout/Sidebar';
-import { getActivities, type ActivityItem } from '@/lib/activities';
-import { dealStages, getDeals, type DealItem } from '@/lib/deals';
+import { getActivitiesFromDb, type ActivityItem } from '@/lib/activities';
+import { dealStages, getDealsFromDb, type DealItem } from '@/lib/deals';
 
 type PipelineData = { name: string; value: number };
 type StageData = { name: string; value: number; color: string };
@@ -99,8 +99,8 @@ export default function Dashboard() {
   });
 
   useEffect(() => {
-    setDeals(getDeals());
-    setActivities(getActivities());
+    getDealsFromDb().then(setDeals).catch(() => setDeals([]));
+    getActivitiesFromDb().then(setActivities).catch(() => setActivities([]));
   }, []);
 
   useEffect(() => {
@@ -345,7 +345,7 @@ export default function Dashboard() {
             <button 
               onClick={() => {
                 if (confirm('Tüm yerel veriler temizlenecek. Emin misiniz?')) {
-                  localStorage.clear();
+                  alert('Veriler artık localStorage yerine database üzerinde tutuluyor.');
                   window.location.reload();
                 }
               }}
@@ -581,3 +581,8 @@ export default function Dashboard() {
     </div>
   );
 }
+
+
+
+
+

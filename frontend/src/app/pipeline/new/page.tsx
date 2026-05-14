@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -17,8 +17,8 @@ import {
 } from 'lucide-react';
 import Sidebar from '@/components/layout/Sidebar';
 import { getAdminUsers, type AdminUser } from '@/lib/admin-users';
-import { getCustomers, type CustomerListItem } from '@/lib/customers';
-import { addDeal, dealStages, getLossReasonOptions, lossReasonList } from '@/lib/deals';
+import { getCustomersFromDb, type CustomerListItem } from '@/lib/customers';
+import { addDealToDb, dealStages, getLossReasonOptionsFromDb, lossReasonList } from '@/lib/deals';
 
 const inputClass = "w-full bg-slate-900/60 border border-border-subtle rounded-xl px-4 py-3 text-sm text-white outline-none transition-all placeholder:text-slate-600 focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20";
 const labelClass = "text-sm font-medium text-slate-300";
@@ -38,9 +38,9 @@ export default function NewDealPage() {
 
   useEffect(() => {
     const loadData = async () => {
-      const storedCustomers = getCustomers();
+      const storedCustomers = await getCustomersFromDb();
       setCustomers(storedCustomers);
-      setLossReasonOptions(getLossReasonOptions());
+      setLossReasonOptions(await getLossReasonOptionsFromDb());
       
       try {
         const adminUsers = await getAdminUsers();
@@ -92,7 +92,7 @@ export default function NewDealPage() {
     ));
   };
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!selectedCustomer) {
       toast.error('Deal oluşturmadan önce kayıtlı bir müşteri seçin.');
@@ -120,16 +120,21 @@ export default function NewDealPage() {
     formData.set('lossReason', lossReason);
     formData.set('company', selectedCustomer.name);
     formData.set('owner', selectedOwners.map((owner) => owner.initials).join(', '));
+    formData.set('customerId', selectedCustomer.id);
+    formData.set('salesUserId', selectedOwners[0].id);
     if (selectedCustomer.city && !String(formData.get('city') ?? '').trim()) {
       formData.set('city', selectedCustomer.city);
     }
 
-    const deal = addDeal(formData);
-
-    setIsSaving(false);
-    toast.success(`${deal.id} oluşturuldu.`);
-    router.push('/pipeline');
-  };
+    try {
+      const deal = await addDealToDb(formData);
+      toast.success(`${deal.id} oluşturuldu.`);
+      router.push('/pipeline');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Deal kaydedilemedi.');
+    } finally {
+      setIsSaving(false);
+    }  };
 
   return (
     <div className="flex min-h-screen bg-main-bg">
@@ -414,3 +419,6 @@ export default function NewDealPage() {
     </div>
   );
 }
+
+
+

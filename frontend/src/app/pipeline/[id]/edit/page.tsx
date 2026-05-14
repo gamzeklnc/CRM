@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -17,8 +17,8 @@ import {
 } from 'lucide-react';
 import Sidebar from '@/components/layout/Sidebar';
 import { getAdminUsers, type AdminUser } from '@/lib/admin-users';
-import { getCustomers, type CustomerListItem } from '@/lib/customers';
-import { dealStages, getDealById, getLossReasonOptions, type DealItem, updateDeal, lossReasonList } from '@/lib/deals';
+import { getCustomersFromDb, type CustomerListItem } from '@/lib/customers';
+import { dealStages, getDealByIdFromDb, getLossReasonOptionsFromDb, type DealItem, updateDealInDb, lossReasonList } from '@/lib/deals';
 
 const inputClass = "w-full bg-slate-900/60 border border-border-subtle rounded-xl px-4 py-3 text-sm text-white outline-none transition-all placeholder:text-slate-600 focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20";
 const labelClass = "text-sm font-medium text-slate-300";
@@ -38,10 +38,10 @@ export default function EditDealPage() {
 
   useEffect(() => {
     const loadData = async () => {
-      const currentDeal = getDealById(params.id);
+      const currentDeal = await getDealByIdFromDb(params.id);
       setDeal(currentDeal);
-      setCustomers(getCustomers());
-      setLossReasonOptions(getLossReasonOptions());
+      setCustomers(await getCustomersFromDb());
+      setLossReasonOptions(await getLossReasonOptionsFromDb());
 
       try {
         const adminUsers = await getAdminUsers();
@@ -71,7 +71,7 @@ export default function EditDealPage() {
     ));
   };
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsSaving(true);
 
@@ -90,12 +90,13 @@ export default function EditDealPage() {
     formData.set('lossReason', lossReason);
     if (selectedOwners.length === 0) {
       setIsSaving(false);
-      toast.error('En az bir satÄ±ÅŸ sorumlusu seÃ§in.');
+      toast.error('En az bir satış sorumlusu seçin.');
       return;
     }
 
     formData.set('owner', selectedOwners.map((owner) => owner.initials).join(', '));
-    const updatedDeal = updateDeal(params.id, formData);
+    formData.set('salesUserId', selectedOwners[0].id);
+    const updatedDeal = await updateDealInDb(params.id, formData);
     setIsSaving(false);
 
     if (!updatedDeal) {
@@ -372,3 +373,6 @@ export default function EditDealPage() {
     </div>
   );
 }
+
+
+

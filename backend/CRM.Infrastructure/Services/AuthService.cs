@@ -38,6 +38,7 @@ namespace CRM.Infrastructure.Services
                 Token = token,
                 Role = user.Role,
                 FullName = user.FullName,
+                Email = user.Email,
                 UserId = user.Id,
                 ExpiresAt = expiry
             };

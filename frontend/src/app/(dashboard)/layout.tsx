@@ -2,15 +2,24 @@
 
 import Sidebar from "@/components/layout/Sidebar";
 import AuthGuard from "@/components/auth/AuthGuard";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, refreshCurrentUser, type AuthUser } from "@/lib/auth";
+import { useEffect, useState } from "react";
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const user = getCurrentUser();
-  const initials = user?.fullName?.split(' ').map(n => n[0]).join('').toUpperCase() || 'SA';
+  const [user, setUser] = useState<AuthUser | null>(null);
+
+  useEffect(() => {
+    setUser(getCurrentUser());
+    refreshCurrentUser().then(setUser).catch(() => setUser(getCurrentUser()));
+  }, []);
+
+  const displayName = user?.fullName?.trim() || 'Kullanıcı';
+  const displayEmail = user?.email?.trim() || 'Profil e-postası yok';
+  const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'K';
 
   return (
     <AuthGuard>
@@ -21,8 +30,8 @@ export default function DashboardLayout({
             <h1 className="text-xl font-semibold text-white">Dashboard</h1>
             <div className="flex items-center gap-4">
               <div className="flex flex-col items-end">
-                <span className="text-sm font-medium text-white">{user?.fullName || 'Sistem Yöneticisi'}</span>
-                <span className="text-xs text-slate-400">{user?.email || 'admin@company.com'}</span>
+                <span className="text-sm font-medium text-white">{displayName}</span>
+                <span className="text-xs text-slate-400">{displayEmail}</span>
               </div>
               <div className="w-10 h-10 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-500 font-bold">
                 {initials}

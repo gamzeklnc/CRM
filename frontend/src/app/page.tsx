@@ -31,7 +31,7 @@ import {
 import Sidebar from '@/components/layout/Sidebar';
 import { getActivitiesFromDb, type ActivityItem } from '@/lib/activities';
 import { dealStages, getDealsFromDb, type DealItem } from '@/lib/deals';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser, refreshCurrentUser, type AuthUser } from '@/lib/auth';
 
 type PipelineData = { name: string; value: number };
 type StageData = { name: string; value: number; color: string };
@@ -89,6 +89,7 @@ export default function Dashboard() {
   const [chartsReady, setChartsReady] = useState(false);
   const [deals, setDeals] = useState<DealItem[]>([]);
   const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [trendRange, setTrendRange] = useState<TrendRange>(6);
   const [filters, setFilters] = useState({
     startDate: '',
@@ -102,10 +103,13 @@ export default function Dashboard() {
   useEffect(() => {
     getDealsFromDb().then(setDeals).catch(() => setDeals([]));
     getActivitiesFromDb().then(setActivities).catch(() => setActivities([]));
+    setUser(getCurrentUser());
+    refreshCurrentUser().then(setUser).catch(() => setUser(getCurrentUser()));
   }, []);
 
-  const user = getCurrentUser();
-  const initials = user?.fullName?.split(' ').map(n => n[0]).join('').toUpperCase() || 'SA';
+  const displayName = user?.fullName?.trim() || 'Kullanıcı';
+  const displayEmail = user?.email?.trim() || 'Profil e-postası yok';
+  const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'K';
 
   useEffect(() => {
     const frameId = requestAnimationFrame(() => setChartsReady(true));
@@ -273,8 +277,8 @@ export default function Dashboard() {
               </button>
             </Link>
             <div className="hidden md:flex bg-slate-800 p-1 px-3 rounded-xl border border-border-subtle flex-col">
-              <span className="text-sm font-medium text-white leading-tight">{user?.fullName || 'Sistem Yöneticisi'}</span>
-              <span className="text-[10px] text-slate-400">{user?.email || 'admin@company.com'}</span>
+              <span className="text-sm font-medium text-white leading-tight">{displayName}</span>
+              <span className="text-[10px] text-slate-400">{displayEmail}</span>
             </div>
             <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-500 font-bold text-sm">
               {initials}

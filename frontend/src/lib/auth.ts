@@ -8,6 +8,7 @@ export type AuthUser = {
 
 const TOKEN_KEY = 'crm-token';
 const USER_KEY = 'crm-user';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5296/api';
 
 export function getToken(): string | null {
   if (typeof window === 'undefined') return null;
@@ -23,6 +24,37 @@ export function getCurrentUser(): AuthUser | null {
   } catch {
     return null;
   }
+}
+
+function normalizeUser(user: any): AuthUser {
+  return {
+    id: user.userId || user.id || user.UserId || user.Id,
+    fullName: user.fullName || user.FullName || '',
+    email: user.email || user.Email || '',
+    role: user.role || user.Role || 'Sales',
+    isActive: user.isActive ?? user.IsActive ?? true
+  };
+}
+
+export function saveCurrentUser(user: any) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(USER_KEY, JSON.stringify(normalizeUser(user)));
+}
+
+export async function refreshCurrentUser(): Promise<AuthUser | null> {
+  if (typeof window === 'undefined') return null;
+  const token = getToken();
+  if (!token) return null;
+
+  const response = await fetch(`${API_URL}/auth/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!response.ok) return getCurrentUser();
+
+  const user = await response.json();
+  saveCurrentUser(user);
+  return getCurrentUser();
 }
 
 export function isAuthenticated(): boolean {
@@ -42,13 +74,7 @@ export function hasRole(roles: string | string[]): boolean {
 export function login(token: string, user: any) {
   if (typeof window === 'undefined') return;
   localStorage.setItem(TOKEN_KEY, token);
-  localStorage.setItem(USER_KEY, JSON.stringify({
-    id: user.userId || user.id,
-    fullName: user.fullName,
-    email: user.email || '',
-    role: user.role,
-    isActive: true
-  }));
+  saveCurrentUser(user);
 }
 
 export function logout() {

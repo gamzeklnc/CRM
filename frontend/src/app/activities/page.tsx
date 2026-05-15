@@ -23,7 +23,7 @@ import toast from 'react-hot-toast';
 import Sidebar from '@/components/layout/Sidebar';
 import { addActivityToDb, getActivitiesFromDb, markActivityCompletedInDb, deleteActivityFromDb, type ActivityItem } from '@/lib/activities';
 import { getCustomersFromDb, type CustomerListItem } from '@/lib/customers';
-import { isCurrentUserAdmin } from '@/lib/auth';
+import { getCurrentUser, isCurrentUserAdmin } from '@/lib/auth';
 
 const inputClass = "w-full bg-slate-900/60 border border-border-subtle rounded-xl px-4 py-3 text-sm text-white outline-none transition-all placeholder:text-slate-600 focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20";
 const labelClass = "text-sm font-medium text-slate-300";

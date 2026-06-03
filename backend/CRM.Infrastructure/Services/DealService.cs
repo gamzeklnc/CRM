@@ -410,6 +410,7 @@ namespace CRM.Infrastructure.Services
             CurrentUpdate = d.CurrentUpdate,
             Notes = d.Notes,
             Status = d.Status,
+            ClosedDate = d.DealResult?.ClosedDate,
             NoteHistory = GetNoteHistoryList(d),
             LastActivityDate = d.Activities?.Where(a => a.IsCompleted).OrderByDescending(a => a.ActivityDate).FirstOrDefault()?.ActivityDate,
             NextActionDate = d.Activities?.Where(a => !a.IsCompleted).OrderBy(a => a.ActivityDate).FirstOrDefault()?.ActivityDate,

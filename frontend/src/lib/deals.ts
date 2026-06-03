@@ -73,6 +73,7 @@ type ApiDeal = {
   notes: string | null;
   noteHistory?: DealNote[];
   status: string;
+  closedDate: string | null;
   lastActivityDate: string | null;
   nextActionDate: string | null;
   nextActionSubject: string | null;
@@ -187,7 +188,7 @@ const mapApiDeal = (deal: ApiDeal): DealItem => {
     lossReason: deal.lossReason,
     wonReason: null,
     finalPrice: null,
-    closedDate: null,
+    closedDate: deal.closedDate,
     lossLesson: null,
     epcPartner: deal.epcPartner,
     deliveryDate: deal.deliveryDate,

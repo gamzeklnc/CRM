@@ -50,9 +50,22 @@ const stageColors: Record<string, string> = {
   rose: '#F43F5E',
 };
 
+const activityColors: Record<string, string> = {
+  'Toplantı': '#8B5CF6',
+  'Ziyaret': '#F59E0B',
+  'Fiyat Güncellemesi': '#3B82F6',
+  'Yeni Müşteri Ekleme': '#10B981',
+  'Arama': '#06B6D4',
+  'Not Ekleme': '#6366F1',
+  'Fırsat Güncellemesi': '#EC4899',
+  'E-posta': '#A855F7',
+  'WhatsApp': '#22C55E',
+  'Diğer': '#64748B',
+};
+
 const formatCurrency = (value: number) => `$${Math.round(value).toLocaleString('en-US')}`;
 const monthLabel = (date: Date) => date.toLocaleDateString('tr-TR', { month: 'short' });
-const isWonDeal = (deal: DealItem) => deal.stage.startsWith('Kazan');
+const isWonDeal = (deal: DealItem) => deal.stage.includes('Kazan');
 const isLostDeal = (deal: DealItem) => deal.stage.includes('Kaybed');
 const isOpenDeal = (deal: DealItem) => !isWonDeal(deal) && !isLostDeal(deal);
 
@@ -87,6 +100,24 @@ const StatCard = ({ title, value, subValue, icon: Icon, color, trend }: any) => 
   </motion.div>
 );
 
+const CustomXAxisTick = (props: any) => {
+  const { x, y, payload } = props;
+  const val = payload.value;
+  const words = val.split(' ');
+  
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text x={0} y={0} dy={10} textAnchor="middle" fill="#64748B" style={{ fontSize: '9px', fontWeight: 500 }}>
+        {words.map((word: string, index: number) => (
+          <tspan x={0} dy={index > 0 ? 10 : 0} key={index}>
+            {word}
+          </tspan>
+        ))}
+      </text>
+    </g>
+  );
+};
+
 export default function Dashboard() {
   const [chartsReady, setChartsReady] = useState(false);
   const [deals, setDeals] = useState<DealItem[]>([]);
@@ -94,6 +125,7 @@ export default function Dashboard() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [trendRange, setTrendRange] = useState<TrendRange>(6);
+  const [selectedRepForChart, setSelectedRepForChart] = useState<string>('all');
   const [filters, setFilters] = useState({
     startDate: '',
     endDate: '',
@@ -165,7 +197,8 @@ export default function Dashboard() {
     const totalDays = closedDeals.reduce((acc, deal) => {
       const created = new Date(deal.createdAt).getTime();
       const closed = deal.closedDate ? new Date(deal.closedDate).getTime() : new Date().getTime();
-      return acc + (closed - created) / (1000 * 60 * 60 * 24);
+      const diff = (closed - created) / (1000 * 60 * 60 * 24);
+      return acc + Math.max(0, diff);
     }, 0);
     
     return Math.round(totalDays / closedDeals.length);
@@ -230,10 +263,16 @@ export default function Dashboard() {
       const names = owners.length > 0 ? owners : ['Belirtilmedi'];
 
       names.forEach((name) => {
-        acc[name] ??= { name, won: 0, total: 0, value: 0 };
-        acc[name].total += 1;
-        acc[name].value += deal.valueAmount;
-        if (isWonDeal(deal)) acc[name].won += 1;
+        const user = users.find(u => u.fullName.toLowerCase() === name.toLowerCase() || u.initials.toLowerCase() === name.toLowerCase());
+        if (!user && name !== 'Belirtilmedi') return;
+        if (user && user.role !== 'Sales') return;
+
+        const displayName = user ? user.fullName : 'Belirtilmedi';
+
+        acc[displayName] ??= { name: displayName, won: 0, total: 0, value: 0 };
+        acc[displayName].total += 1;
+        acc[displayName].value += deal.valueAmount;
+        if (isWonDeal(deal)) acc[displayName].won += 1;
       });
 
       return acc;
@@ -248,7 +287,7 @@ export default function Dashboard() {
         value: formatCurrency(user.value),
         rate: `${user.total > 0 ? Math.round((user.won / user.total) * 100) : 0}%`,
       }));
-  }, [filteredDeals]);
+  }, [filteredDeals, users]);
 
   const recentActivities = useMemo(() => {
     return filteredActivities
@@ -288,7 +327,9 @@ export default function Dashboard() {
       return isWithinCurrentWeek(act.completedAt || act.createdAt || act.date);
     });
 
-    return users.map(u => {
+    const salesUsers = users.filter(u => u.role === 'Sales');
+
+    return salesUsers.map(u => {
       const uActs = thisWeekActs.filter(act => act.user.toLowerCase() === u.fullName.toLowerCase());
       
       const breakdown = uActs.reduce<Record<string, number>>((acc, act) => {
@@ -306,6 +347,32 @@ export default function Dashboard() {
       };
     }).sort((a, b) => b.total - a.total);
   }, [activities, users, filters.customer]);
+
+  const activityChartData = useMemo(() => {
+    if (selectedRepForChart === 'all') {
+      return weeklyActivities.map(wa => ({
+        name: wa.userName.split(' ')[0],
+        fullName: wa.userName,
+        ...wa.breakdown
+      }));
+    } else {
+      const rep = weeklyActivities.find(wa => wa.userId === selectedRepForChart);
+      if (!rep) return [];
+
+      return Object.entries(rep.breakdown).map(([type, count]) => ({
+        name: type,
+        value: count,
+      }));
+    }
+  }, [weeklyActivities, selectedRepForChart]);
+
+  const activeTypes = useMemo(() => {
+    const types = new Set<string>();
+    weeklyActivities.forEach(wa => {
+      Object.keys(wa.breakdown).forEach(t => types.add(t));
+    });
+    return Array.from(types);
+  }, [weeklyActivities]);
 
   const hasPipelineData = pipelineData.some((item) => item.value > 0);
 
@@ -365,8 +432,8 @@ export default function Dashboard() {
                 className="bg-slate-900 border border-border-subtle rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 min-w-[150px]"
               >
                 <option value="all">Tüm Ekip</option>
-                {Array.from(new Set(deals.map(d => d.owner))).map(user => (
-                  <option key={user} value={user}>{user}</option>
+                {users.filter(u => u.role === 'Sales').map(u => (
+                  <option key={u.fullName} value={u.fullName}>{u.fullName}</option>
                 ))}
               </select>
             </div>
@@ -420,13 +487,14 @@ export default function Dashboard() {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
-            <StatCard title="Pipeline" value={formatCurrency(totalPipeline)} subValue={`${openDeals.length} açık`} icon={Layers} color="blue" />
-            <StatCard title="Kazanılan" value={formatCurrency(wonValue)} subValue={`${wonDeals.length} deal`} icon={Award} color="emerald" />
-            <StatCard title="Kaybedilen" value={formatCurrency(lostValue)} subValue={`${lostDeals.length} deal`} icon={XCircle} color="rose" />
             <StatCard title="Kapasite" value={`${Number(totalCapacity.toFixed(1))} MW`} icon={Activity} color="orange" />
             <StatCard title="Açık Deal" value={String(openDeals.length)} icon={BarChartIcon} color="slate" />
-            <StatCard title="Kazanma Oranı" value={`%${winRate}`} icon={TrendingUp} color="indigo" />
+            <StatCard title="Pipeline" value={formatCurrency(totalPipeline)} subValue={`${openDeals.length} açık`} icon={Layers} color="blue" />
             <StatCard title="Ort. Deal Değeri" value={formatCurrency(averageDealValue)} icon={DollarSign} color="purple" />
+            
+            <StatCard title="Kazanılan" value={formatCurrency(wonValue)} subValue={`${wonDeals.length} deal`} icon={Award} color="emerald" />
+            <StatCard title="Kaybedilen" value={formatCurrency(lostValue)} subValue={`${lostDeals.length} deal`} icon={XCircle} color="rose" />
+            <StatCard title="Kazanma Oranı" value={`%${winRate}`} icon={TrendingUp} color="indigo" />
             <StatCard title="Kapanma Süresi" value={`${averageClosingTime} Gün`} icon={Clock} color="rose" />
           </div>
 
@@ -566,8 +634,8 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-            <div className="xl:col-span-2 glass p-4 md:p-8 rounded-[24px] md:rounded-[32px]">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="glass p-4 md:p-8 rounded-[24px] md:rounded-[32px]">
               <h3 className="text-lg font-semibold text-white mb-6">Haftalık Satış Sorumlusu Aktifliği</h3>
               <table className="crm-table">
                 <thead>
@@ -625,29 +693,67 @@ export default function Dashboard() {
               )}
             </div>
 
-            <div className="glass p-4 md:p-8 rounded-[24px] md:rounded-[32px]">
-              <h3 className="text-lg font-semibold text-white mb-6">Son Aktiviteler</h3>
-              <div className="space-y-6">
-                {recentActivities.map((act, i) => (
-                  <div key={`${act.user}-${act.time}-${i}`} className="flex gap-4">
-                    <div className="mt-1 w-2 h-2 rounded-full bg-blue-500 ring-4 ring-blue-500/10" />
-                    <div>
-                      <p className="text-sm text-slate-200">
-                        <span className="font-semibold text-blue-400">{act.user}</span>, <span className="text-white font-medium">{act.company}</span> ile <span className="text-white font-medium">{act.type}</span> aktivitesini tamamladi
-                      </p>
-                      <span className="text-xs text-slate-500">{act.time}</span>
-                    </div>
+            <div className="glass p-4 md:p-8 rounded-[24px] md:rounded-[32px] min-w-0">
+              <div className="flex items-center justify-between gap-3 mb-6">
+                <h3 className="text-lg font-semibold text-white">Aktivite Grafiği</h3>
+                <select
+                  value={selectedRepForChart}
+                  onChange={(e) => setSelectedRepForChart(e.target.value)}
+                  className="bg-slate-900 border border-border-subtle rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 max-w-[150px]"
+                >
+                  <option value="all">Tüm Satışçılar</option>
+                  {weeklyActivities.map(wa => (
+                    <option key={wa.userId} value={wa.userId}>{wa.userName}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="h-[280px] md:h-[350px] min-w-0">
+                {chartsReady && activityChartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    {selectedRepForChart === 'all' ? (
+                      <BarChart data={activityChartData as any[]}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                        <XAxis dataKey="name" stroke="#64748B" fontSize={11} axisLine={false} tickLine={false} />
+                        <YAxis stroke="#64748B" fontSize={11} axisLine={false} tickLine={false} allowDecimals={false} />
+                        <Tooltip
+                          contentStyle={{ background: '#1E293B', border: '1px solid #334155', borderRadius: '12px' }}
+                          itemStyle={{ color: '#F8FAFC' }}
+                        />
+                        {activeTypes.map(type => (
+                          <Bar 
+                            key={type} 
+                            dataKey={type} 
+                            stackId="a" 
+                            fill={activityColors[type] || '#64748B'} 
+                            radius={[2, 2, 0, 0]} 
+                            barSize={18} 
+                          />
+                        ))}
+                      </BarChart>
+                    ) : (
+                      <BarChart data={activityChartData as any[]} margin={{ bottom: 20 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                        <XAxis dataKey="name" interval={0} tick={<CustomXAxisTick />} axisLine={false} tickLine={false} />
+                        <YAxis stroke="#64748B" fontSize={11} axisLine={false} tickLine={false} allowDecimals={false} />
+                        <Tooltip
+                          contentStyle={{ background: '#1E293B', border: '1px solid #334155', borderRadius: '12px' }}
+                          itemStyle={{ color: '#F8FAFC' }}
+                        />
+                        <Bar dataKey="value" name="Aktivite Sayısı" radius={[4, 4, 0, 0]} barSize={20}>
+                          {activityChartData.map((entry: any, index: number) => (
+                            <Cell key={`cell-${index}`} fill={activityColors[entry.name] || '#64748B'} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    )}
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full rounded-2xl border border-dashed border-border-subtle bg-slate-900/30 flex items-center justify-center text-sm text-slate-500 p-4 text-center">
+                    {chartsReady ? 'Bu hafta için aktivite grafiği verisi yok.' : 'Grafik yükleniyor...'}
                   </div>
-                ))}
-                {recentActivities.length === 0 && (
-                  <p className="rounded-2xl border border-dashed border-border-subtle bg-slate-900/30 p-4 text-sm text-slate-500">
-                    Henüz tamamlanan aktivite yok.
-                  </p>
                 )}
               </div>
-              <button className="w-full mt-8 py-3 text-sm font-medium text-slate-400 hover:text-white transition-colors border border-border-subtle rounded-xl hover:bg-slate-800">
-                Tüm Aktiviteleri Gör
-              </button>
             </div>
           </div>
 
@@ -691,6 +797,31 @@ export default function Dashboard() {
                   Satış kullanıcısı tablosu için deal verisi bekleniyor.
                 </div>
               )}
+            </div>
+
+            <div className="glass p-4 md:p-8 rounded-[24px] md:rounded-[32px]">
+              <h3 className="text-lg font-semibold text-white mb-6">Son Aktiviteler</h3>
+              <div className="space-y-6">
+                {recentActivities.map((act, i) => (
+                  <div key={`${act.user}-${act.time}-${i}`} className="flex gap-4">
+                    <div className="mt-1 w-2 h-2 rounded-full bg-blue-500 ring-4 ring-blue-500/10" />
+                    <div>
+                      <p className="text-sm text-slate-200">
+                        <span className="font-semibold text-blue-400">{act.user}</span>, <span className="text-white font-medium">{act.company}</span> ile <span className="text-white font-medium">{act.type}</span> aktivitesini tamamladi
+                      </p>
+                      <span className="text-xs text-slate-500">{act.time}</span>
+                    </div>
+                  </div>
+                ))}
+                {recentActivities.length === 0 && (
+                  <p className="rounded-2xl border border-dashed border-border-subtle bg-slate-900/30 p-4 text-sm text-slate-500">
+                    Henüz tamamlanan aktivite yok.
+                  </p>
+                )}
+              </div>
+              <button className="w-full mt-8 py-3 text-sm font-medium text-slate-400 hover:text-white transition-colors border border-border-subtle rounded-xl hover:bg-slate-800">
+                Tüm Aktiviteleri Gör
+              </button>
             </div>
           </div>
         </div>

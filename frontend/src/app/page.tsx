@@ -39,6 +39,7 @@ type PipelineData = { name: string; value: number };
 type StageData = { name: string; value: number; color: string };
 type TopSalesUser = { name: string; won: number; value: string; rate: string };
 type TrendRange = 1 | 3 | 6 | 12 | 'all';
+type ActivityChartPeriod = 'weekly' | 'monthly';
 
 const stageColors: Record<string, string> = {
   slate: '#94A3B8',
@@ -126,6 +127,7 @@ export default function Dashboard() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [trendRange, setTrendRange] = useState<TrendRange>(6);
   const [selectedRepForChart, setSelectedRepForChart] = useState<string>('all');
+  const [activityChartPeriod, setActivityChartPeriod] = useState<ActivityChartPeriod>('weekly');
   const [filters, setFilters] = useState({
     startDate: '',
     endDate: '',
@@ -321,6 +323,15 @@ export default function Dashboard() {
     return date >= startOfWeek && date < endOfWeek;
   };
 
+  const isWithinCurrentMonth = (dateStr: string | null | undefined) => {
+    if (!dateStr) return false;
+    const date = new Date(dateStr);
+    if (Number.isNaN(date.getTime())) return false;
+
+    const now = new Date();
+    return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
+  };
+
   const weeklyActivities = useMemo(() => {
     const thisWeekActs = activities.filter(act => {
       if (filters.customer !== 'all' && act.company !== filters.customer) return false;
@@ -348,15 +359,45 @@ export default function Dashboard() {
     }).sort((a, b) => b.total - a.total);
   }, [activities, users, filters.customer]);
 
+  const chartPeriodActivities = useMemo(() => {
+    const periodActs = activities.filter(act => {
+      if (filters.customer !== 'all' && act.company !== filters.customer) return false;
+      const activityDate = act.completedAt || act.createdAt || act.date;
+      return activityChartPeriod === 'weekly'
+        ? isWithinCurrentWeek(activityDate)
+        : isWithinCurrentMonth(activityDate);
+    });
+
+    const salesUsers = users.filter(u => u.role === 'Sales');
+
+    return salesUsers.map(u => {
+      const uActs = periodActs.filter(act => act.user.toLowerCase() === u.fullName.toLowerCase());
+
+      const breakdown = uActs.reduce<Record<string, number>>((acc, act) => {
+        const type = act.type || 'DiÄŸer';
+        acc[type] = (acc[type] || 0) + 1;
+        return acc;
+      }, {});
+
+      return {
+        userId: u.id,
+        userName: u.fullName,
+        initials: u.initials,
+        total: uActs.length,
+        breakdown,
+      };
+    }).sort((a, b) => b.total - a.total);
+  }, [activities, users, filters.customer, activityChartPeriod]);
+
   const activityChartData = useMemo(() => {
     if (selectedRepForChart === 'all') {
-      return weeklyActivities.map(wa => ({
+      return chartPeriodActivities.filter(wa => wa.total > 0).map(wa => ({
         name: wa.userName.split(' ')[0],
         fullName: wa.userName,
         ...wa.breakdown
       }));
     } else {
-      const rep = weeklyActivities.find(wa => wa.userId === selectedRepForChart);
+      const rep = chartPeriodActivities.find(wa => wa.userId === selectedRepForChart);
       if (!rep) return [];
 
       return Object.entries(rep.breakdown).map(([type, count]) => ({
@@ -364,15 +405,15 @@ export default function Dashboard() {
         value: count,
       }));
     }
-  }, [weeklyActivities, selectedRepForChart]);
+  }, [chartPeriodActivities, selectedRepForChart]);
 
   const activeTypes = useMemo(() => {
     const types = new Set<string>();
-    weeklyActivities.forEach(wa => {
+    chartPeriodActivities.forEach(wa => {
       Object.keys(wa.breakdown).forEach(t => types.add(t));
     });
     return Array.from(types);
-  }, [weeklyActivities]);
+  }, [chartPeriodActivities]);
 
   const hasPipelineData = pipelineData.some((item) => item.value > 0);
 
@@ -694,18 +735,39 @@ export default function Dashboard() {
             </div>
 
             <div className="glass p-4 md:p-8 rounded-[24px] md:rounded-[32px] min-w-0">
-              <div className="flex items-center justify-between gap-3 mb-6">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
                 <h3 className="text-lg font-semibold text-white">Aktivite Grafiği</h3>
-                <select
-                  value={selectedRepForChart}
-                  onChange={(e) => setSelectedRepForChart(e.target.value)}
-                  className="bg-slate-900 border border-border-subtle rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 max-w-[150px]"
-                >
-                  <option value="all">Tüm Satışçılar</option>
-                  {weeklyActivities.map(wa => (
-                    <option key={wa.userId} value={wa.userId}>{wa.userName}</option>
-                  ))}
-                </select>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex rounded-xl border border-border-subtle bg-slate-900 p-1">
+                    {([
+                      ['weekly', 'Haftalık'],
+                      ['monthly', 'Aylık'],
+                    ] as const).map(([period, label]) => (
+                      <button
+                        key={period}
+                        type="button"
+                        onClick={() => setActivityChartPeriod(period)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          activityChartPeriod === period
+                            ? 'bg-blue-500 text-white shadow-sm'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <select
+                    value={selectedRepForChart}
+                    onChange={(e) => setSelectedRepForChart(e.target.value)}
+                    className="bg-slate-900 border border-border-subtle rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 max-w-[150px]"
+                  >
+                    <option value="all">Tüm Satışçılar</option>
+                    {chartPeriodActivities.map(wa => (
+                      <option key={wa.userId} value={wa.userId}>{wa.userName}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div className="h-[280px] md:h-[350px] min-w-0">
@@ -750,7 +812,9 @@ export default function Dashboard() {
                   </ResponsiveContainer>
                 ) : (
                   <div className="h-full rounded-2xl border border-dashed border-border-subtle bg-slate-900/30 flex items-center justify-center text-sm text-slate-500 p-4 text-center">
-                    {chartsReady ? 'Bu hafta için aktivite grafiği verisi yok.' : 'Grafik yükleniyor...'}
+                    {chartsReady
+                      ? `${activityChartPeriod === 'weekly' ? 'Bu hafta' : 'Bu ay'} için aktivite grafiği verisi yok.`
+                      : 'Grafik yükleniyor...'}
                   </div>
                 )}
               </div>
